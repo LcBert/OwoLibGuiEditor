@@ -1,0 +1,854 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
+# =====================================================================
+# MODELLI DI STRUTTURA DATI CONFORMI ALL'XSD DI OωO-LIB
+# =====================================================================
+
+class UIComponent:
+    def __init__(self, comp_id, comp_type="button", text=""):
+        self.id = comp_id
+        self.type = comp_type # 'button', 'label', 'box', 'checkbox'
+        self.text = text
+        self.parent = None
+        self.bounds: tuple[int, int, int, int] = (0, 0, 0, 0)
+        
+        # Sizing ufficiale oωo-lib basato su sotto-tag e attributo method dell'XSD
+        self.width_method = "content"   # 'content', 'fill', 'fixed'
+        self.width_value = "100"
+        self.height_method = "content"  # 'content', 'fill', 'fixed'
+        self.height_value = "20"
+        
+        # Gestione avanzata del Padding per Faccia
+        self.padding_type = "all"       # 'all' oppure 'individual'
+        self.padding_all = "0"
+        self.padding_top = "0"
+        self.padding_bottom = "0"
+        self.padding_left = "0"
+        self.padding_right = "0"
+        
+        # Gestione avanzata dei Margini per Faccia
+        self.margins_type = "all"       # 'all' oppure 'individual'
+        self.margins_all = "0"
+        self.margins_top = "0"
+        self.margins_bottom = "0"
+        self.margins_left = "0"
+        self.margins_right = "0"
+        
+        # Proprietà specifiche per etichette (label)
+        self.label_shadow = "false"
+        self.label_max_width = ""
+        
+        # Proprietà specifiche per box colorati
+        self.box_color = "#FF4CAF50"
+
+class UILayout(UIComponent):
+    def __init__(self, comp_id, layout_type="Flow Layout", rows="2", cols="2", direction="vertical"):
+        super().__init__(comp_id, comp_type="layout")
+        self.layout_type = layout_type # "Flow Layout" oppure "Grid Layout"
+        self.rows = rows
+        self.cols = cols
+        self.direction = direction     # "vertical" oppure "horizontal"
+        self.children = []
+        
+        # I layout di default riempiono lo spazio assegnato
+        self.width_method = "fill"
+        self.width_value = "100"
+        self.height_method = "fill"
+        self.height_value = "100"
+        
+        self.padding_type = "all"
+        self.padding_all = "10"
+        
+        self.margins_type = "all"
+        self.margins_all = "0"
+        
+        self.horiz_align = "center"
+        self.vert_align = "center"
+        self.surface_type = "panel-dark" # 'panel-dark', 'vanilla-translucent', 'flat-black', 'none'
+
+    def add_child(self, child):
+        if child.parent:
+            child.parent.remove_child(child)
+        child.parent = self
+        self.children.append(child)
+        return True
+
+    def remove_child(self, child):
+        if child in self.children:
+            self.children.remove(child)
+            child.parent = None
+
+# =====================================================================
+# APPLICAZIONE IDE DESIGNER COMPLETA (NEOFORGE 1.21.1)
+# =====================================================================
+
+class OwoQtDesigner:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("oωo-lib UI Advanced Designer (NeoForge 1.21.1)")
+        self.root.geometry("1350x955")
+        
+        self.main_layout = UILayout("root_flow", "Flow Layout", direction="vertical")
+        self.selected_component = self.main_layout
+        
+        self.layout_counter = 1
+        self.widget_counter = 1
+        self.dragged_component = None
+        self.drag_proxy = None
+        
+        self.start_x = 0
+        self.start_y = 0
+        self.is_dragging = False
+
+        self.setup_style()
+        self.create_left_toolbox()
+        self.create_center_viewport()
+        self.create_right_property_panel()
+        
+        self.rebuild_and_snap()
+
+    def setup_style(self):
+        self.bg_dark = "#1e1e1e"
+        self.bg_panel = "#2d2d2d"
+        self.fg_light = "#ffffff"
+        self.accent_blue = "#2196F3"
+        self.root.configure(bg=self.bg_dark)
+
+    def create_left_toolbox(self):
+        toolbox = tk.Frame(self.root, width=260, bg=self.bg_panel, bd=1, relief=tk.SOLID)
+        toolbox.pack(side=tk.LEFT, fill=tk.Y)
+        
+        tk.Label(toolbox, text="Widget Box (oωo-lib)", fg=self.fg_light, bg=self.bg_panel, font=("Arial", 11, "bold")).pack(pady=10)
+        
+        tk.Label(toolbox, text="Progetto", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
+        tk.Button(toolbox, text="📂 Importa XML", bg="#FF9800", fg="white", command=self.import_xml).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="💾 Esporta XML Valido", bg="#4CAF50", fg="white", command=self.export_xml).pack(fill=tk.X, padx=15, pady=2)
+        
+        tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
+
+        tk.Label(toolbox, text="Contenitori / Layouts", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
+        tk.Button(toolbox, text="+ Flow Layout", command=lambda: self.add_layout_node("Flow Layout")).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Grid Layout", command=lambda: self.add_layout_node("Grid Layout")).pack(fill=tk.X, padx=15, pady=2)
+
+        tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
+
+        tk.Label(toolbox, text="Componenti Base (Foglia)", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
+        tk.Button(toolbox, text="+ Bottone (button)", command=lambda: self.add_leaf_node("button", "A Button"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Testo (label)", command=lambda: self.add_leaf_node("label", "Text Label"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Spatola Colore (box)", command=lambda: self.add_leaf_node("box", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Spunta (checkbox)", command=lambda: self.add_leaf_node("checkbox", "Option"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+
+    def create_center_viewport(self):
+        view_container = tk.Frame(self.root, bg=self.bg_dark)
+        view_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        self.target_label = tk.Label(view_container, text="Selezionato: root_flow", fg=self.accent_blue, bg=self.bg_dark, font=("Arial", 10, "bold"))
+        self.target_label.pack(anchor=tk.W, pady=2)
+        
+        self.canvas = tk.Canvas(view_container, bg="#151515", highlightthickness=1, highlightbackground="#333")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        
+        self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
+
+    def create_right_property_panel(self):
+        self.prop_panel = tk.Frame(self.root, width=280, bg=self.bg_panel, bd=1, relief=tk.SOLID)
+        self.prop_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        tk.Label(self.prop_panel, text="Property Editor", fg=self.fg_light, bg=self.bg_panel, font=("Arial", 12, "bold")).pack(pady=10)
+        
+        # --- NUOVO FRAME ISOLATO PER ID E TESTO (Solo per elementi foglia) ---
+        self.id_text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        
+        tk.Label(self.id_text_frame, text="Widget ID:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=2)
+        self.prop_id_entry = tk.Entry(self.id_text_frame)
+        self.prop_id_entry.pack(fill=tk.X, padx=15, pady=2)
+
+        self.prop_text_label = tk.Label(self.id_text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel)
+        self.prop_text_label.pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_text_entry = tk.Entry(self.id_text_frame)
+        self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
+
+        # Configurazione Sizing Larghezza (horizontal)
+        self.sizing_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        tk.Label(self.sizing_frame, text="Metodo Orizzontale (horizontal):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_w_method = tk.StringVar(value="content")
+        tk.OptionMenu(self.sizing_frame, self.prop_w_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
+        self.prop_w_val = tk.Entry(self.sizing_frame); self.prop_w_val.pack(fill=tk.X, padx=15, pady=2)
+
+        # Configurazione Sizing Altezza (vertical)
+        tk.Label(self.sizing_frame, text="Metodo Verticale (vertical):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_h_method = tk.StringVar(value="content")
+        tk.OptionMenu(self.sizing_frame, self.prop_h_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
+        self.prop_h_val = tk.Entry(self.sizing_frame); self.prop_h_val.pack(fill=tk.X, padx=15, pady=2)
+
+        # Contenitore Padding
+        self.padding_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        tk.Label(self.padding_frame, text="Tipo di Padding (Facciale):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_padding_type = tk.StringVar(value="all")
+        tk.OptionMenu(self.padding_frame, self.prop_padding_type, "all", "individual", command=self.toggle_padding_views).pack(fill=tk.X, padx=15, pady=2)
+        
+        self.padding_placeholder_frame = tk.Frame(self.padding_frame, bg=self.bg_panel); self.padding_placeholder_frame.pack(fill=tk.X, padx=15, pady=2)
+        self.pad_all_frame = tk.Frame(self.padding_placeholder_frame, bg=self.bg_panel)
+        tk.Label(self.pad_all_frame, text="Valore All:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT, padx=5)
+        self.prop_padding_all_entry = tk.Entry(self.pad_all_frame, width=12); self.prop_padding_all_entry.pack(side=tk.LEFT, padx=5)
+        
+        self.pad_indiv_frame = tk.Frame(self.padding_placeholder_frame, bg=self.bg_panel)
+        tk.Label(self.pad_indiv_frame, text="T:", fg="white", bg=self.bg_panel).grid(row=0, column=0, padx=2, pady=2)
+        self.prop_pad_top = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_top.grid(row=0, column=1, padx=2, pady=2)
+        tk.Label(self.pad_indiv_frame, text="B:", fg="white", bg=self.bg_panel).grid(row=0, column=2, padx=2, pady=2)
+        self.prop_pad_bottom = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_bottom.grid(row=0, column=3, padx=2, pady=2)
+        tk.Label(self.pad_indiv_frame, text="L:", fg="white", bg=self.bg_panel).grid(row=1, column=0, padx=2, pady=2)
+        self.prop_pad_left = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_left.grid(row=1, column=1, padx=2, pady=2)
+        tk.Label(self.pad_indiv_frame, text="R:", fg="white", bg=self.bg_panel).grid(row=1, column=2, padx=2, pady=2)
+        self.prop_pad_right = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_right.grid(row=1, column=3, padx=2, pady=2)
+
+        # Contenitore Margins
+        self.margins_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        tk.Label(self.margins_frame, text="Tipo di Margini (Facciale):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_margins_type = tk.StringVar(value="all")
+        tk.OptionMenu(self.margins_frame, self.prop_margins_type, "all", "individual", command=self.toggle_margins_views).pack(fill=tk.X, padx=15, pady=2)
+        
+        self.margins_placeholder_frame = tk.Frame(self.margins_frame, bg=self.bg_panel); self.margins_placeholder_frame.pack(fill=tk.X, padx=15, pady=2)
+        self.margin_all_frame = tk.Frame(self.margins_placeholder_frame, bg=self.bg_panel)
+        tk.Label(self.margin_all_frame, text="Valore All:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT, padx=5)
+        self.prop_margins_all_entry = tk.Entry(self.margin_all_frame, width=12); self.prop_margins_all_entry.pack(side=tk.LEFT, padx=5)
+        
+        self.margin_indiv_frame = tk.Frame(self.margins_placeholder_frame, bg=self.bg_panel)
+        tk.Label(self.margin_indiv_frame, text="T:", fg="white", bg=self.bg_panel).grid(row=0, column=0, padx=2, pady=2)
+        self.prop_margin_top = tk.Entry(self.margin_indiv_frame, width=5); self.prop_margin_top.grid(row=0, column=1, padx=2, pady=2)
+        tk.Label(self.margin_indiv_frame, text="B:", fg="white", bg=self.bg_panel).grid(row=0, column=2, padx=2, pady=2)
+        self.prop_margin_bottom = tk.Entry(self.margin_indiv_frame, width=5); self.prop_margin_bottom.grid(row=0, column=3, padx=2, pady=2)
+        tk.Label(self.margin_indiv_frame, text="L:", fg="white", bg=self.bg_panel).grid(row=1, column=0, padx=2, pady=2)
+        self.prop_margin_left = tk.Entry(self.margin_indiv_frame, width=5); self.prop_margin_left.grid(row=1, column=1, padx=2, pady=2)
+        tk.Label(self.margin_indiv_frame, text="R:", fg="white", bg=self.bg_panel).grid(row=1, column=2, padx=2, pady=2)
+        self.prop_margin_right = tk.Entry(self.margin_indiv_frame, width=5); self.prop_margin_right.grid(row=1, column=3, padx=2, pady=2)
+
+        # Controlli Specifici Layout
+        self.layout_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        tk.Label(self.layout_extra_frame, text="Allineamento Orizzontale:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, pady=2)
+        self.prop_l_horiz = tk.StringVar(value="center")
+        tk.OptionMenu(self.layout_extra_frame, self.prop_l_horiz, "center", "left", "right").pack(fill=tk.X)
+        
+        tk.Label(self.layout_extra_frame, text="Allineamento Verticale:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, pady=2)
+        self.prop_l_vert = tk.StringVar(value="center")
+        tk.OptionMenu(self.layout_extra_frame, self.prop_l_vert, "center", "top", "bottom").pack(fill=tk.X)
+
+        tk.Label(self.layout_extra_frame, text="Tipo Superficie (Surface):", fg="white", bg=self.bg_panel).pack(anchor=tk.W, pady=2)
+        self.prop_l_surface = tk.StringVar(value="panel-dark")
+        tk.OptionMenu(self.layout_extra_frame, self.prop_l_surface, "panel-dark", "vanilla-translucent", "flat-black", "none").pack(fill=tk.X)
+
+        self.flow_prop_frame = tk.Frame(self.layout_extra_frame, bg=self.bg_panel)
+        tk.Label(self.flow_prop_frame, text="Direzione Flow (direction):", fg="#2196F3", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, pady=2)
+        self.prop_l_direction = tk.StringVar(value="vertical")
+        tk.OptionMenu(self.flow_prop_frame, self.prop_l_direction, "vertical", "horizontal").pack(fill=tk.X)
+
+        self.grid_prop_frame = tk.Frame(self.layout_extra_frame, bg=self.bg_panel)
+        tk.Label(self.grid_prop_frame, text="R:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT)
+        self.prop_rows_entry = tk.Entry(self.grid_prop_frame, width=4); self.prop_rows_entry.pack(side=tk.LEFT, padx=4)
+        tk.Label(self.grid_prop_frame, text="C:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT)
+        self.prop_cols_entry = tk.Entry(self.grid_prop_frame, width=4); self.prop_cols_entry.pack(side=tk.LEFT, padx=4)
+
+        # Controlli Specifici Foglie
+        self.leaf_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        self.label_shadow_label = tk.Label(self.leaf_extra_frame, text="Ombra Testo (Label shadow):", fg="white", bg=self.bg_panel)
+        self.prop_l_shadow = tk.StringVar(value="false")
+        self.label_shadow_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_l_shadow, "true", "false")
+        self.label_mw_label = tk.Label(self.leaf_extra_frame, text="Larghezza Max Testo (Max-Width):", fg="white", bg=self.bg_panel)
+        self.prop_l_mw = tk.Entry(self.leaf_extra_frame)
+        self.box_color_label = tk.Label(self.leaf_extra_frame, text="Colore Sfondo Box (HEX):", fg="white", bg=self.bg_panel)
+        self.prop_b_color = tk.Entry(self.leaf_extra_frame)
+
+        # Bottoni d'Azione (Sempre visibili fissati in basso)
+        self.actions_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        self.actions_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
+        tk.Button(self.actions_frame, text="✔️ Applica Proprietà", bg=self.accent_blue, fg="white", command=self.apply_properties).pack(fill=tk.X, padx=15, pady=5)
+        tk.Button(self.actions_frame, text="❌ Elimina Componente", bg="#D32F2F", fg="white", command=self.delete_selected_component).pack(fill=tk.X, padx=15, pady=2)
+        
+        self.hide_property_editor()
+
+    def toggle_padding_views(self, val):
+        if val == "all":
+            self.pad_indiv_frame.pack_forget()
+            self.pad_all_frame.pack(fill=tk.X, pady=2)
+        else:
+            self.pad_all_frame.pack_forget()
+            self.pad_indiv_frame.pack(fill=tk.X, pady=2)
+
+    def toggle_margins_views(self, val):
+        if val == "all":
+            self.margin_indiv_frame.pack_forget()
+            self.margin_all_frame.pack(fill=tk.X, pady=2)
+        else:
+            self.margin_all_frame.pack_forget()
+            self.margin_indiv_frame.pack(fill=tk.X, pady=2)
+
+    # =====================================================================
+    # MOTORE GERARCHICO DI CALCOLO DELLE BOUNDS (AUTO-SNAPPING)
+    # =====================================================================
+
+    def rebuild_and_snap(self):
+        self.canvas.delete("all")
+        cx1, cy1, cx2, cy2 = 40, 40, 680, 560
+        self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill="#1a1a1a", outline="#444", width=2)
+        self.canvas.create_text(cx1+10, cy1+15, text="Game Viewport (oωo Layout Snapping)", fill="gray", anchor=tk.W)
+        
+        self.main_layout.bounds = (cx1, cy1, cx2, cy2)
+        self.render_layout_recursive(self.main_layout, cx1+20, cy1+40, cx2-20, cy2-20)
+        
+        if self.selected_component:
+            display_name = self.selected_component.id
+            display_type = f"{self.selected_component.layout_type} ({self.selected_component.direction})" if isinstance(self.selected_component, UILayout) else self.selected_component.type
+            self.target_label.config(text=f"Selezionato: {display_name} ({display_type})", fg=self.accent_blue)
+
+    def render_layout_recursive(self, layout, x1, y1, x2, y2):
+        is_root = (layout.id == "root_flow")
+        color = "#FF9800" if layout.layout_type == "Flow Layout" else "#9C27B0"
+        if self.selected_component == layout and not is_root: color = self.accent_blue
+        
+        if not is_root:
+            self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=2, dash=(3, 3), tags=f"click_{layout.id}")
+            self.canvas.create_text(x1+5, y1+10, text=f"{layout.id} [{layout.layout_type} ({layout.direction})]", fill=color, font=("Arial", 8, "bold"), anchor=tk.W)
+            
+        layout.bounds = (int(x1), int(y1), int(x2), int(y2))
+        if not layout.children: return
+
+        num_children = len(layout.children)
+        for i, child in enumerate(layout.children):
+            cx1, cy1, cx2, cy2 = x1, y1, x2, y2
+
+            if layout.layout_type == "Flow Layout" and layout.direction == "vertical":
+                slot_h = (y2 - y1) / num_children
+                cx1, cy1 = x1 + 10, y1 + (i * slot_h) + 12
+                cx2, cy2 = x2 - 10, y1 + ((i + 1) * slot_h) - 8
+            elif layout.layout_type == "Flow Layout" and layout.direction == "horizontal":
+                slot_w = (x2 - x1) / num_children
+                cx1, cy1 = x1 + (i * slot_w) + 10, y1 + 12
+                cx2, cy2 = x1 + ((i + 1) * slot_w) - 10, y2 - 8
+            elif layout.layout_type == "Grid Layout":
+                try:
+                    r_max, c_max = max(1, int(layout.rows)), max(1, int(layout.cols))
+                except ValueError:
+                    r_max, c_max = 2, 2
+                r, c = i // c_max, i % c_max
+                slot_w, slot_h = (x2 - x1) / c_max, (y2 - y1) / r_max
+                cx1, cy1 = x1 + (c * slot_w) + 6, y1 + (r * slot_h) + 12
+                cx2, cy2 = x1 + ((c + 1) * slot_w) - 6, y1 + ((r + 1) * slot_h) - 6
+
+            child.bounds = (int(cx1), int(cy1), int(cx2), int(cy2))
+
+            if isinstance(child, UILayout):
+                self.render_layout_recursive(child, cx1, cy1, cx2, cy2)
+            elif isinstance(child, UIComponent):
+                colors = {"button": "#3a3a3a", "label": "#151515", "box": child.box_color, "checkbox": "#2e2e2e"}
+                outlines = {"button": "#fff", "label": "#555", "box": "#ffffff", "checkbox": "#aaa"}
+                
+                b_color = colors.get(child.type, "#3a3a3a") if self.selected_component != child else "#555"
+                o_color = outlines.get(child.type, "#fff") if self.selected_component != child else self.accent_blue
+                
+                self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill=b_color, outline=o_color, width=1.5, tags=f"click_{child.id}")
+                text_disp = f"[{child.type}] {child.text}" if child.type != "box" else "[box component]"
+                self.canvas.create_text((cx1+cx2)/2, (cy1+cy2)/2, text=text_disp, fill="white", font=("Arial", 9), tags=f"click_{child.id}")
+
+    # =====================================================================
+    # SEPARAZIONE NETTA TRA CLICK DI SELEZIONE E TRASCINAMENTO
+    # =====================================================================
+
+    def on_canvas_click(self, event):
+        self.start_x = event.x
+        self.start_y = event.y
+        self.is_dragging = False
+        self.dragged_component = None
+
+        clicked_tags = self.canvas.find_withtag(tk.CURRENT)
+        if not clicked_tags:
+            self.selected_component = self.main_layout
+            self.hide_property_editor()
+            self.rebuild_and_snap()
+            return
+            
+        for tag in self.canvas.gettags(clicked_tags[0]):
+            if tag.startswith("click_"):
+                comp_id = tag.replace("click_", "")
+                comp = self.find_component_by_id(self.main_layout, comp_id)
+                if comp:
+                    self.selected_component = comp
+                    self.show_property_editor(comp)
+                    self.rebuild_and_snap()
+                    return
+
+    def on_canvas_drag(self, event):
+        if not self.selected_component or self.selected_component.id == "root_flow": return
+        dx = abs(event.x - self.start_x)
+        dy = abs(event.y - self.start_y)
+        
+        if not self.is_dragging and (dx > 5 or dy > 5):
+            self.is_dragging = True
+            self.dragged_component = self.selected_component
+                
+        if self.is_dragging:
+            if self.drag_proxy: self.canvas.delete(self.drag_proxy)
+            self.drag_proxy = self.canvas.create_rectangle(event.x - 50, event.y - 15, event.x + 50, event.y + 15, outline="#2196F3", width=2, fill="#2196F3", stipple="gray25")
+
+    def on_canvas_release(self, event):
+        if self.drag_proxy: self.canvas.delete(self.drag_proxy); self.drag_proxy = None
+        if self.is_dragging and self.dragged_component:
+            target_layout = self.find_layout_at_coords(self.main_layout, event.x, event.y)
+            if target_layout and target_layout != self.dragged_component and not self.is_child_of(target_layout, self.dragged_component):
+                target_layout.add_child(self.dragged_component)
+                self.selected_component = self.dragged_component
+                self.show_property_editor(self.dragged_component)
+        self.dragged_component = None
+        self.is_dragging = False
+        self.rebuild_and_snap()
+
+    def find_layout_at_coords(self, current_layout, x, y):
+        bx1, by1, bx2, by2 = current_layout.bounds
+        if not (bx1 <= x <= bx2 and by1 <= y <= by2): return None
+        for child in current_layout.children:
+            if isinstance(child, UILayout):
+                found = self.find_layout_at_coords(child, x, y)
+                if found: return found
+        return current_layout
+
+    def is_child_of(self, node, potential_parent):
+        current = node.parent
+        while current:
+            if current == potential_parent: return True
+            current = current.parent
+        return False
+
+    def find_component_by_id(self, current_node, target_id):
+        if current_node.id == target_id: return current_node
+        if isinstance(current_node, UILayout):
+            for child in current_node.children:
+                found = self.find_component_by_id(child, target_id)
+                if found: return found
+        return None
+
+    def get_active_layout_parent(self):
+        if isinstance(self.selected_component, UILayout):
+            return self.selected_component
+        elif self.selected_component and self.selected_component.parent:
+            return self.selected_component.parent
+        return self.main_layout
+
+    def add_layout_node(self, layout_type):
+        parent = self.get_active_layout_parent()
+        l_id = f"layout_{self.layout_counter}"
+        self.layout_counter += 1
+        new_layout = UILayout(l_id, layout_type)
+        if parent.add_child(new_layout):
+            self.selected_component = new_layout
+            self.rebuild_and_snap()
+            self.show_property_editor(new_layout)
+
+    def add_leaf_node(self, leaf_type, default_text):
+        parent = self.get_active_layout_parent()
+        w_id = f"{leaf_type}_{self.widget_counter}"
+        self.widget_counter += 1
+        new_node = UIComponent(w_id, comp_type=leaf_type, text=default_text)
+        if parent.add_child(new_node):
+            self.selected_component = new_node
+            self.rebuild_and_snap()
+            self.show_property_editor(new_node)
+
+    def remove_component_recursive(self, current_layout, target_node):
+        if target_node in current_layout.children:
+            current_layout.remove_child(target_node)
+            return True
+        for child in current_layout.children:
+            if isinstance(child, UILayout):
+                if self.remove_component_recursive(child, target_node): return True
+        return False
+
+    def delete_selected_component(self):
+        if not self.selected_component or self.selected_component.id == "root_flow": return
+        if self.remove_component_recursive(self.main_layout, self.selected_component):
+            self.selected_component = self.main_layout
+            self.hide_property_editor()
+            self.rebuild_and_snap()
+
+    # =====================================================================
+    # PROPERTY EDITOR DINAMICO CON HIDING DEI CAMPI ID/TESTO SUI LAYOUT
+    # =====================================================================
+
+    def show_property_editor(self, comp):
+        # 1. Smonta tutti i moduli visivi per ricalcolare l'ordine sequenziale pulito
+        self.id_text_frame.pack_forget()
+        self.sizing_frame.pack_forget()
+        self.padding_frame.pack_forget()
+        self.margins_frame.pack_forget()
+        self.layout_extra_frame.pack_forget()
+        self.leaf_extra_frame.pack_forget()
+
+        # 2. Configura il pannello basandoti sulla tipologia d'istanza selezionata col click
+        if isinstance(comp, UILayout):
+            # RIMOSSI: Per i layout nascondiamo del tutto ID e Testo entry
+            self.sizing_frame.pack(fill=tk.X)
+            self.padding_frame.pack(fill=tk.X)
+            self.margins_frame.pack(fill=tk.X)
+            self.layout_extra_frame.pack(fill=tk.X, padx=15, pady=5)
+            
+            self.prop_l_horiz.set(comp.horiz_align)
+            self.prop_l_vert.set(comp.vert_align)
+            self.prop_l_surface.set(comp.surface_type)
+            
+            if comp.layout_type == "Flow Layout":
+                self.flow_prop_frame.pack(fill=tk.X, pady=4)
+                self.grid_prop_frame.pack_forget()
+                self.prop_l_direction.set(comp.direction)
+            elif comp.layout_type == "Grid Layout":
+                self.grid_prop_frame.pack(fill=tk.X, pady=4)
+                self.flow_prop_frame.pack_forget()
+                self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
+                self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
+        else:
+            # Per le foglie (pulsanti, scritte) mostriamo i campi di modifica ID e Testo
+            self.id_text_frame.pack(fill=tk.X)
+            self.sizing_frame.pack(fill=tk.X)
+            self.padding_frame.pack(fill=tk.X)
+            self.margins_frame.pack(fill=tk.X)
+            self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
+            
+            self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
+            self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
+            
+            if comp.type == "label":
+                self.label_shadow_label.pack(anchor=tk.W); self.label_shadow_menu.pack(fill=tk.X)
+                self.label_mw_label.pack(anchor=tk.W); self.prop_l_mw.pack(fill=tk.X)
+                self.prop_l_shadow.set(comp.label_shadow)
+                self.prop_l_mw.delete(0, tk.END); self.prop_l_mw.insert(0, comp.label_max_width)
+            else:
+                self.label_shadow_label.pack_forget(); self.label_shadow_menu.pack_forget()
+                self.label_mw_label.pack_forget(); self.prop_l_mw.pack_forget()
+                
+            if comp.type == "box":
+                self.box_color_label.pack(anchor=tk.W); self.prop_b_color.pack(fill=tk.X)
+                self.prop_b_color.delete(0, tk.END); self.prop_b_color.insert(0, comp.box_color)
+            else:
+                self.box_color_label.pack_forget(); self.prop_b_color.pack_forget()
+
+        # 3. Carica i dati comuni relativi a Sizing, Padding e Margini
+        self.prop_w_method.set(comp.width_method)
+        self.prop_w_val.delete(0, tk.END); self.prop_w_val.insert(0, comp.width_value)
+        self.prop_h_method.set(comp.height_method)
+        self.prop_h_val.delete(0, tk.END); self.prop_h_val.insert(0, comp.height_value)
+        
+        self.prop_padding_type.set(comp.padding_type)
+        self.prop_padding_all_entry.delete(0, tk.END); self.prop_padding_all_entry.insert(0, comp.padding_all)
+        self.prop_pad_top.delete(0, tk.END); self.prop_pad_top.insert(0, comp.padding_top)
+        self.prop_pad_bottom.delete(0, tk.END); self.prop_pad_bottom.insert(0, comp.padding_bottom)
+        self.prop_pad_left.delete(0, tk.END); self.prop_pad_left.insert(0, comp.padding_left)
+        self.prop_pad_right.delete(0, tk.END); self.prop_pad_right.insert(0, comp.padding_right)
+        self.toggle_padding_views(comp.padding_type)
+        
+        self.prop_margins_type.set(comp.margins_type)
+        self.prop_margins_all_entry.delete(0, tk.END); self.prop_margins_all_entry.insert(0, comp.margins_all)
+        self.prop_margin_top.delete(0, tk.END); self.prop_margin_top.insert(0, comp.margins_top)
+        self.prop_margin_bottom.delete(0, tk.END); self.prop_margin_bottom.insert(0, comp.margins_bottom)
+        self.prop_margin_left.delete(0, tk.END); self.prop_margin_left.insert(0, comp.margins_left)
+        self.prop_margin_right.delete(0, tk.END); self.prop_margin_right.insert(0, comp.margins_right)
+        self.toggle_margins_views(comp.margins_type)
+
+    def hide_property_editor(self):
+        self.id_text_frame.pack_forget()
+        self.sizing_frame.pack_forget()
+        self.padding_frame.pack_forget()
+        self.margins_frame.pack_forget()
+        self.layout_extra_frame.pack_forget()
+        self.leaf_extra_frame.pack_forget()
+
+    def apply_properties(self):
+        if not self.selected_component: return
+        
+        # Applica ID e Testo modificati solo se l'elemento selezionato non è un layout
+        if not isinstance(self.selected_component, UILayout):
+            new_id = self.prop_id_entry.get().strip().replace(" ", "_")
+            if not new_id: return
+            if new_id != self.selected_component.id and self.find_component_by_id(self.main_layout, new_id) is not None:
+                messagebox.showerror("Errore ID", "ID già esistente!")
+                return
+            self.selected_component.id = new_id
+            self.selected_component.text = self.prop_text_entry.get()
+            
+        self.selected_component.width_method = self.prop_w_method.get()
+        self.selected_component.width_value = self.prop_w_val.get()
+        self.selected_component.height_method = self.prop_h_method.get()
+        self.selected_component.height_value = self.prop_h_val.get()
+        
+        self.selected_component.padding_type = self.prop_padding_type.get()
+        self.selected_component.padding_all = self.prop_padding_all_entry.get()
+        self.selected_component.padding_top = self.prop_pad_top.get()
+        self.selected_component.padding_bottom = self.prop_pad_bottom.get()
+        self.selected_component.padding_left = self.prop_pad_left.get()
+        self.selected_component.padding_right = self.prop_pad_right.get()
+        
+        self.selected_component.margins_type = self.prop_margins_type.get()
+        self.selected_component.margins_all = self.prop_margins_all_entry.get()
+        self.selected_component.margins_top = self.prop_margin_top.get()
+        self.selected_component.margins_bottom = self.prop_margin_bottom.get()
+        self.selected_component.margins_left = self.prop_margin_left.get()
+        self.selected_component.margins_right = self.prop_margin_right.get()
+        
+        if isinstance(self.selected_component, UILayout):
+            self.selected_component.horiz_align = self.prop_l_horiz.get()
+            self.selected_component.vert_align = self.prop_l_vert.get()
+            self.selected_component.surface_type = self.prop_l_surface.get()
+            
+            if self.selected_component.layout_type == "Flow Layout":
+                self.selected_component.direction = self.prop_l_direction.get()
+            elif self.selected_component.layout_type == "Grid Layout":
+                self.selected_component.rows = self.prop_rows_entry.get()
+                self.selected_component.cols = self.prop_cols_entry.get()
+        else:
+            if self.selected_component.type == "label":
+                self.selected_component.label_shadow = self.prop_l_shadow.get()
+                self.selected_component.label_max_width = self.prop_l_mw.get()
+            elif self.selected_component.type == "box":
+                self.selected_component.box_color = self.prop_b_color.get()
+                
+        self.rebuild_and_snap()
+
+# =====================================================================
+# EXPORT XML / IMPORT XML VALIDATO AD ALBERO XSD
+# =====================================================================
+
+    def export_xml(self):
+        owo_ui = ET.Element("owo-ui", {
+            "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+            "xsi:noNamespaceSchemaLocation": "https://raw.githubusercontent.com/wisp-forest/owo-lib/1.20/owo-ui.xsd"
+        })
+        components_node = ET.SubElement(owo_ui, "components")
+        self.serialize_node_recursive(components_node, self.main_layout)
+        
+        xml_str = ET.tostring(owo_ui, encoding="utf-8")
+        pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
+        
+        file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML Files", "*.xml")])
+        if file_path:
+            with open(file_path, "w", encoding="utf-8") as f: f.write(pretty_xml)
+            messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
+
+    def serialize_node_recursive(self, xml_parent, obj):
+        attrs = {}
+        if isinstance(obj, UILayout):
+            if obj.layout_type == "Flow Layout":
+                tag, attrs = "flow-layout", {"direction": obj.direction}
+            elif obj.layout_type == "Grid Layout":
+                tag, attrs = "grid-layout", {"rows": obj.rows, "columns": obj.cols}
+            else:
+                return
+        else:
+            tag = obj.type
+            attrs = {"id": obj.id}
+
+        node = ET.SubElement(xml_parent, tag, attrs)
+        
+        if isinstance(obj, UILayout) and obj.children:
+            children_container = ET.SubElement(node, "children")
+            for child in obj.children:
+                self.serialize_node_recursive(children_container, child)
+
+        if tag in ["button", "label", "checkbox"] and obj.text:
+            ET.SubElement(node, "text").text = obj.text
+        elif tag == "box":
+            ET.SubElement(node, "color").text = obj.box_color
+            ET.SubElement(node, "fill").text = "true"
+            ET.SubElement(node, "direction").text = "top-to-bottom"
+
+        if tag == "label":
+            if obj.label_shadow == "true": ET.SubElement(node, "shadow").text = "true"
+            if obj.label_max_width: ET.SubElement(node, "max-width").text = obj.label_max_width
+
+        sizing_node = ET.SubElement(node, "sizing")
+        w_val = str(obj.width_value) if obj.width_method in ["fill", "fixed"] else "0"
+        h_node = ET.SubElement(sizing_node, "horizontal", {"method": obj.width_method})
+        h_node.text = w_val
+            
+        l_val = str(obj.height_value) if obj.height_method in ["fill", "fixed"] else "0"
+        v_node = ET.SubElement(sizing_node, "vertical", {"method": obj.height_method})
+        v_node.text = l_val
+
+        # Compilazione tag <margins>
+        has_margins = False
+        if obj.margins_type == "all" and obj.margins_all != "0": has_margins = True
+        elif obj.margins_type == "individual" and (obj.margins_top != "0" or obj.margins_bottom != "0" or obj.margins_left != "0" or obj.margins_right != "0"): has_margins = True
+        
+        if has_margins:
+            margins_node = ET.SubElement(node, "margins")
+            if obj.margins_type == "all":
+                ET.SubElement(margins_node, "all").text = obj.margins_all
+            else:
+                if obj.margins_top != "0": ET.SubElement(margins_node, "top").text = str(obj.margins_top)
+                if obj.margins_bottom != "0": ET.SubElement(margins_node, "bottom").text = str(obj.margins_bottom)
+                if obj.margins_left != "0": ET.SubElement(margins_node, "left").text = str(obj.margins_left)
+                if obj.margins_right != "0": ET.SubElement(margins_node, "right").text = str(obj.margins_right)
+            
+        # Compilazione tag <padding>
+        has_padding = False
+        if obj.padding_type == "all" and obj.padding_all != "0": has_padding = True
+        elif obj.padding_type == "individual" and (obj.padding_top != "0" or obj.padding_bottom != "0" or obj.padding_left != "0" or obj.padding_right != "0"): has_padding = True
+        
+        if has_padding or isinstance(obj, UILayout):
+            padding_node = ET.SubElement(node, "padding")
+            if obj.padding_type == "all":
+                ET.SubElement(padding_node, "all").text = obj.padding_all
+            else:
+                if obj.padding_top != "0": ET.SubElement(padding_node, "top").text = str(obj.padding_top)
+                if obj.padding_bottom != "0": ET.SubElement(padding_node, "bottom").text = str(obj.padding_bottom)
+                if obj.padding_left != "0": ET.SubElement(padding_node, "left").text = str(obj.padding_left)
+                if obj.padding_right != "0": ET.SubElement(padding_node, "right").text = str(obj.padding_right)
+
+        if isinstance(obj, UILayout):
+            ET.SubElement(node, "horizontal-alignment").text = obj.horiz_align
+            ET.SubElement(node, "vertical-alignment").text = obj.vert_align
+            
+            if obj.id == "root_flow":
+                surface_node = ET.SubElement(node, "surface")
+                ET.SubElement(surface_node, "vanilla-translucent")
+            elif obj.surface_type != "none":
+                surface_node = ET.SubElement(node, "surface")
+                if obj.surface_type == "panel-dark": ET.SubElement(surface_node, "panel", {"dark": "true"})
+                elif obj.surface_type == "vanilla-translucent": ET.SubElement(surface_node, "vanilla-translucent")
+                elif obj.surface_type == "flat-black": ET.SubElement(surface_node, "flat").text = "#C0101010"
+
+    def import_xml(self):
+        file_path = filedialog.askopenfilename(filetypes=[("XML Files", "*.xml")])
+        if not file_path: return
+        try:
+            tree = ET.parse(file_path)
+            components = tree.getroot().find("components")
+            if components is None: return
+            main_flow = components.find("flow-layout")
+            if main_flow is None: return
+            
+            self.main_layout = UILayout("root_flow", "Flow Layout", direction=main_flow.get("direction", "vertical"))
+            self.selected_component = self.main_layout
+            
+            main_children = main_flow.find("children")
+            if main_children is not None: self.parse_xml_recursive(main_children, self.main_layout)
+            self.rebuild_and_snap()
+            messagebox.showinfo("Importato", "File XML importato correttamente!")
+        except Exception as e:
+            messagebox.showerror("Errore", f"Impossibile parsare l'XML: {e}")
+
+    def parse_xml_recursive(self, xml_children, parent_obj):
+        for child in xml_children:
+            if child.tag in ["flow-layout", "grid-layout"]:
+                l_type = "Grid Layout" if child.tag == "grid-layout" else "Flow Layout"
+                l_id = f"layout_{self.layout_counter}"
+                self.layout_counter += 1
+                
+                sub_layout = UILayout(l_id, l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
+                
+                p_node = child.find("padding")
+                if p_node is not None:
+                    all_node = p_node.find("all")
+                    if all_node is not None:
+                        sub_layout.padding_type = "all"
+                        sub_layout.padding_all = all_node.text if all_node.text else "0"
+                    else:
+                        sub_layout.padding_type = "individual"
+                        t = p_node.find("top"); sub_layout.padding_top = t.text if t is not None else "0"
+                        b = p_node.find("bottom"); sub_layout.padding_bottom = b.text if b is not None else "0"
+                        l = p_node.find("left"); sub_layout.padding_left = l.text if l is not None else "0"
+                        r = p_node.find("right"); sub_layout.padding_right = r.text if r is not None else "0"
+
+                m_node = child.find("margins")
+                if m_node is not None:
+                    all_node = m_node.find("all")
+                    if all_node is not None:
+                        sub_layout.margins_type = "all"
+                        sub_layout.margins_all = all_node.text if all_node.text else "0"
+                    else:
+                        sub_layout.margins_type = "individual"
+                        t = m_node.find("top"); sub_layout.margins_top = t.text if t is not None else "0"
+                        b = m_node.find("bottom"); sub_layout.margins_bottom = b.text if b is not None else "0"
+                        l = m_node.find("left"); sub_layout.margins_left = l.text if l is not None else "0"
+                        r = m_node.find("right"); sub_layout.margins_right = r.text if r is not None else "0"
+
+                h_align = child.find("horizontal-alignment")
+                if h_align is not None: sub_layout.horiz_align = h_align.text if h_align.text else "center"
+                v_align = child.find("vertical-alignment")
+                if v_align is not None: sub_layout.vert_align = v_align.text if v_align.text else "center"
+
+                sizing = child.find("sizing")
+                if sizing is not None:
+                    h_xml = sizing.find("horizontal")
+                    if h_xml is not None:
+                        sub_layout.width_method = h_xml.get("method", "content")
+                        sub_layout.width_value = h_xml.text if h_xml.text else "100"
+                    v_xml = sizing.find("vertical")
+                    if v_xml is not None:
+                        sub_layout.height_method = v_xml.get("method", "content")
+                        sub_layout.height_value = v_xml.text if v_xml.text else "100"
+                    
+                parent_obj.add_child(sub_layout)
+                inner_children = child.find("children")
+                if inner_children is not None: self.parse_xml_recursive(inner_children, sub_layout)
+                
+            elif child.tag in ["button", "label", "box", "checkbox"]:
+                w_id = child.get("id", f"{child.tag}_{self.widget_counter}")
+                self.widget_counter += 1
+                text_node = child.find("text")
+                w_text = text_node.text if text_node is not None else ""
+                
+                leaf_node = UIComponent(w_id, comp_type=child.tag, text=w_text)
+                
+                p_node = child.find("padding")
+                if p_node is not None:
+                    all_node = p_node.find("all")
+                    if all_node is not None:
+                        leaf_node.padding_type = "all"
+                        leaf_node.padding_all = all_node.text if all_node.text else "0"
+                    else:
+                        leaf_node.padding_type = "individual"
+                        t = p_node.find("top"); leaf_node.padding_top = t.text if t is not None else "0"
+                        b = p_node.find("bottom"); leaf_node.padding_bottom = b.text if b is not None else "0"
+                        l = p_node.find("left"); leaf_node.padding_left = l.text if l is not None else "0"
+                        r = p_node.find("right"); leaf_node.padding_right = r.text if r is not None else "0"
+
+                m_node = child.find("margins")
+                if m_node is not None:
+                    all_node = m_node.find("all")
+                    if all_node is not None:
+                        leaf_node.margins_type = "all"
+                        leaf_node.margins_all = all_node.text if all_node.text else "0"
+                    else:
+                        leaf_node.margins_type = "individual"
+                        t = m_node.find("top"); leaf_node.margins_top = t.text if t is not None else "0"
+                        b = m_node.find("bottom"); leaf_node.margins_bottom = b.text if b is not None else "0"
+                        l = m_node.find("left"); leaf_node.margins_left = l.text if l is not None else "0"
+                        r = m_node.find("right"); leaf_node.margins_right = r.text if r is not None else "0"
+
+                if child.tag == "label":
+                    sh = child.find("shadow")
+                    if sh is not None: leaf_node.label_shadow = sh.text if sh.text else "false"
+                    mw = child.find("max-width")
+                    if mw is not None: leaf_node.label_max_width = mw.text if mw.text else ""
+                elif child.tag == "box":
+                    col = child.find("color")
+                    if col is not None: leaf_node.box_color = col.text if col.text else "#FF4CAF50"
+
+                sizing = child.find("sizing")
+                if sizing is not None:
+                    h_xml = sizing.find("horizontal")
+                    if h_xml is not None:
+                        leaf_node.width_method = h_xml.get("method", "content")
+                        leaf_node.width_value = h_xml.text if h_xml.text else "100"
+                    v_xml = sizing.find("vertical")
+                    if v_xml is not None:
+                        leaf_node.height_method = v_xml.get("method", "content")
+                        leaf_node.height_value = v_xml.text if v_xml.text else "20"
+                
+                parent_obj.add_child(leaf_node)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = OwoQtDesigner(root)
+    root.mainloop()
