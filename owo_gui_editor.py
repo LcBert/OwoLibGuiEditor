@@ -4,6 +4,15 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 # =====================================================================
+# FUNZIONE DI UTILITY PER IL COMFORT DEL TYPE-CHECKER
+# =====================================================================
+def safe_text(node: ET.Element | None, default: str = "0") -> str:
+    """Garantisce al type-checker che il valore restituito sia sempre una str"""
+    if node is not None and node.text is not None:
+        return node.text
+    return default
+
+# =====================================================================
 # MODELLI DI STRUTTURA DATI CONFORMI ALL'XSD DI OωO-LIB
 # =====================================================================
 
@@ -13,6 +22,8 @@ class UIComponent:
         self.type = comp_type # 'button', 'label', 'box', 'checkbox'
         self.text = text
         self.parent = None
+        
+        # Annotazione esplicita per evitare eccezioni di tipo bounds
         self.bounds: tuple[int, int, int, int] = (0, 0, 0, 0)
         
         # Sizing ufficiale oωo-lib basato su sotto-tag e attributo method dell'XSD
@@ -127,6 +138,28 @@ class OwoQtDesigner:
         tk.Button(toolbox, text="📂 Importa XML", bg="#FF9800", fg="white", command=self.import_xml).pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="💾 Esporta XML Valido", bg="#4CAF50", fg="white", command=self.export_xml).pack(fill=tk.X, padx=15, pady=2)
         
+        # Container fisso per i controlli del template (risolve il bug del pack sparito)
+        self.template_control_container = tk.Frame(toolbox, bg=self.bg_panel)
+        self.template_control_container.pack(fill=tk.X, padx=15, pady=4)
+
+        self.prop_export_template = tk.BooleanVar(value=False)
+        self.template_check = tk.Checkbutton(
+            self.template_control_container, text="Esporta come Template", 
+            variable=self.prop_export_template,
+            bg=self.bg_panel, fg="#2196F3", selectcolor="#1e1e1e",
+            activebackground=self.bg_panel, activeforeground="white",
+            font=("Arial", 9, "bold"),
+            command=self.toggle_template_name_visibility
+        )
+        self.template_check.pack(anchor=tk.W, pady=2)
+        
+        # Sottomenu di testo per il nome del template
+        self.template_name_frame = tk.Frame(self.template_control_container, bg=self.bg_panel)
+        tk.Label(self.template_name_frame, text="Nome Template (name):", fg="white", bg=self.bg_panel, font=("Arial", 8)).pack(anchor=tk.W)
+        self.prop_template_name_entry = tk.Entry(self.template_name_frame)
+        self.prop_template_name_entry.insert(0, "custom_template")
+        self.prop_template_name_entry.pack(fill=tk.X, pady=2)
+        
         tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
 
         tk.Label(toolbox, text="Contenitori / Layouts", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
@@ -140,6 +173,13 @@ class OwoQtDesigner:
         tk.Button(toolbox, text="+ Testo (label)", command=lambda: self.add_leaf_node("label", "Text Label"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="+ Spatola Colore (box)", command=lambda: self.add_leaf_node("box", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="+ Spunta (checkbox)", command=lambda: self.add_leaf_node("checkbox", "Option"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+
+    def toggle_template_name_visibility(self):
+        """Mostra o nasconde l'entry del nome del template senza rompere il layout"""
+        if self.prop_export_template.get():
+            self.template_name_frame.pack(fill=tk.X, pady=2)
+        else:
+            self.template_name_frame.pack_forget()
 
     def create_center_viewport(self):
         view_container = tk.Frame(self.root, bg=self.bg_dark)
@@ -161,16 +201,17 @@ class OwoQtDesigner:
         
         tk.Label(self.prop_panel, text="Property Editor", fg=self.fg_light, bg=self.bg_panel, font=("Arial", 12, "bold")).pack(pady=10)
         
-        # --- NUOVO FRAME ISOLATO PER ID E TESTO (Solo per elementi foglia) ---
-        self.id_text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
-        
-        tk.Label(self.id_text_frame, text="Widget ID:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=2)
-        self.prop_id_entry = tk.Entry(self.id_text_frame)
+        # --- MODULO ID (Sempre stampato all'inizio per qualsiasi tipo di elemento!) ---
+        self.id_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        self.id_frame.pack(fill=tk.X)
+        tk.Label(self.id_frame, text="Widget ID:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=2)
+        self.prop_id_entry = tk.Entry(self.id_frame)
         self.prop_id_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        self.prop_text_label = tk.Label(self.id_text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel)
-        self.prop_text_label.pack(anchor=tk.W, padx=15, pady=4)
-        self.prop_text_entry = tk.Entry(self.id_text_frame)
+        # --- MODULO TESTO (Questo invece viene nascosto/mostrato dinamicamente) ---
+        self.text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        tk.Label(self.text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=4)
+        self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
         # Configurazione Sizing Larghezza (horizontal)
@@ -181,10 +222,12 @@ class OwoQtDesigner:
         self.prop_w_val = tk.Entry(self.sizing_frame); self.prop_w_val.pack(fill=tk.X, padx=15, pady=2)
 
         # Configurazione Sizing Altezza (vertical)
-        tk.Label(self.sizing_frame, text="Metodo Verticale (vertical):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        self.sizing_frame_v = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        self.sizing_frame_v.pack(fill=tk.X)
+        tk.Label(self.sizing_frame_v, text="Metodo Verticale (vertical):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_h_method = tk.StringVar(value="content")
-        tk.OptionMenu(self.sizing_frame, self.prop_h_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
-        self.prop_h_val = tk.Entry(self.sizing_frame); self.prop_h_val.pack(fill=tk.X, padx=15, pady=2)
+        tk.OptionMenu(self.sizing_frame_v, self.prop_h_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
+        self.prop_h_val = tk.Entry(self.sizing_frame_v); self.prop_h_val.pack(fill=tk.X, padx=15, pady=2)
 
         # Contenitore Padding
         self.padding_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
@@ -263,7 +306,7 @@ class OwoQtDesigner:
         self.box_color_label = tk.Label(self.leaf_extra_frame, text="Colore Sfondo Box (HEX):", fg="white", bg=self.bg_panel)
         self.prop_b_color = tk.Entry(self.leaf_extra_frame)
 
-        # Bottoni d'Azione (Sempre visibili fissati in basso)
+        # Bottoni d'Azione (Fissati in basso)
         self.actions_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         self.actions_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
         tk.Button(self.actions_frame, text="✔️ Applica Proprietà", bg=self.accent_blue, fg="white", command=self.apply_properties).pack(fill=tk.X, padx=15, pady=5)
@@ -474,21 +517,25 @@ class OwoQtDesigner:
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR DINAMICO CON HIDING DEI CAMPI ID/TESTO SUI LAYOUT
+    # PROPERTY EDITOR STRUTTURATO (ID INTEGRATO PER OGNI ELEMENTO)
     # =====================================================================
 
     def show_property_editor(self, comp):
         # 1. Smonta tutti i moduli visivi per ricalcolare l'ordine sequenziale pulito
-        self.id_text_frame.pack_forget()
+        self.id_frame.pack(fill=tk.X)
+        self.text_frame.pack_forget()
         self.sizing_frame.pack_forget()
         self.padding_frame.pack_forget()
         self.margins_frame.pack_forget()
         self.layout_extra_frame.pack_forget()
         self.leaf_extra_frame.pack_forget()
 
-        # 2. Configura il pannello basandoti sulla tipologia d'istanza selezionata col click
+        # 2. L'ID adesso viene mostrato SEMPRE (Sia per Layout che per foglie!)
+        self.prop_id_entry.delete(0, tk.END)
+        self.prop_id_entry.insert(0, comp.id)
+
         if isinstance(comp, UILayout):
-            # RIMOSSI: Per i layout nascondiamo del tutto ID e Testo entry
+            # Se è un layout, attiva i sottomenu strutturali e di allineamento
             self.sizing_frame.pack(fill=tk.X)
             self.padding_frame.pack(fill=tk.X)
             self.margins_frame.pack(fill=tk.X)
@@ -508,14 +555,13 @@ class OwoQtDesigner:
                 self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
                 self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
         else:
-            # Per le foglie (pulsanti, scritte) mostriamo i campi di modifica ID e Testo
-            self.id_text_frame.pack(fill=tk.X)
+            # Per le foglie (pulsanti, scritte) ripristina e popola la casella del testo
+            self.text_frame.pack(fill=tk.X)
             self.sizing_frame.pack(fill=tk.X)
             self.padding_frame.pack(fill=tk.X)
             self.margins_frame.pack(fill=tk.X)
             self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
-            self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
             self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
             
             if comp.type == "label":
@@ -556,7 +602,8 @@ class OwoQtDesigner:
         self.toggle_margins_views(comp.margins_type)
 
     def hide_property_editor(self):
-        self.id_text_frame.pack_forget()
+        self.id_frame.pack_forget()
+        self.text_frame.pack_forget()
         self.sizing_frame.pack_forget()
         self.padding_frame.pack_forget()
         self.margins_frame.pack_forget()
@@ -566,14 +613,15 @@ class OwoQtDesigner:
     def apply_properties(self):
         if not self.selected_component: return
         
-        # Applica ID e Testo modificati solo se l'elemento selezionato non è un layout
+        # Validazione e cambio dell'ID applicata globalmente a tutti i nodi (Layout e foglie inclusi)
+        new_id = self.prop_id_entry.get().strip().replace(" ", "_")
+        if not new_id: return
+        if new_id != self.selected_component.id and self.find_component_by_id(self.main_layout, new_id) is not None:
+            messagebox.showerror("Errore ID", "ID già esistente!")
+            return
+        self.selected_component.id = new_id
+        
         if not isinstance(self.selected_component, UILayout):
-            new_id = self.prop_id_entry.get().strip().replace(" ", "_")
-            if not new_id: return
-            if new_id != self.selected_component.id and self.find_component_by_id(self.main_layout, new_id) is not None:
-                messagebox.showerror("Errore ID", "ID già esistente!")
-                return
-            self.selected_component.id = new_id
             self.selected_component.text = self.prop_text_entry.get()
             
         self.selected_component.width_method = self.prop_w_method.get()
@@ -623,8 +671,18 @@ class OwoQtDesigner:
             "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
             "xsi:noNamespaceSchemaLocation": "https://raw.githubusercontent.com/wisp-forest/owo-lib/1.20/owo-ui.xsd"
         })
-        components_node = ET.SubElement(owo_ui, "components")
-        self.serialize_node_recursive(components_node, self.main_layout)
+        
+        # Scelta dinamica della struttura principale (Templates vs Components)
+        if self.prop_export_template.get():
+            templates_node = ET.SubElement(owo_ui, "templates")
+            template_name = self.prop_template_name_entry.get().strip().replace(" ", "_")
+            if not template_name:
+                template_name = "custom_template"
+            template_node = ET.SubElement(templates_node, "template", {"name": template_name})
+            self.serialize_node_recursive(template_node, self.main_layout)
+        else:
+            components_node = ET.SubElement(owo_ui, "components")
+            self.serialize_node_recursive(components_node, self.main_layout)
         
         xml_str = ET.tostring(owo_ui, encoding="utf-8")
         pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
@@ -635,17 +693,16 @@ class OwoQtDesigner:
             messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
 
     def serialize_node_recursive(self, xml_parent, obj):
-        attrs = {}
+        attrs = {"id": obj.id} # Iniezione dell'attributo id nativo per ogni blocco (layout inclusi)
         if isinstance(obj, UILayout):
             if obj.layout_type == "Flow Layout":
-                tag, attrs = "flow-layout", {"direction": obj.direction}
+                tag, attrs["direction"] = "flow-layout", obj.direction
             elif obj.layout_type == "Grid Layout":
-                tag, attrs = "grid-layout", {"rows": obj.rows, "columns": obj.cols}
+                tag, attrs["rows"], attrs["columns"] = "grid-layout", obj.rows, obj.cols
             else:
                 return
         else:
             tag = obj.type
-            attrs = {"id": obj.id}
 
         node = ET.SubElement(xml_parent, tag, attrs)
         
@@ -722,12 +779,80 @@ class OwoQtDesigner:
         if not file_path: return
         try:
             tree = ET.parse(file_path)
-            components = tree.getroot().find("components")
-            if components is None: return
-            main_flow = components.find("flow-layout")
-            if main_flow is None: return
+            root = tree.getroot()
             
-            self.main_layout = UILayout("root_flow", "Flow Layout", direction=main_flow.get("direction", "vertical"))
+            components = root.find("components")
+            main_flow = None
+            is_template = False
+            t_name = "custom_template"
+            
+            if components is not None:
+                main_flow = components.find("flow-layout") or components.find("grid-layout")
+            else:
+                templates = root.find("templates")
+                if templates is not None:
+                    template_el = templates.find("template")
+                    if template_el is not None:
+                        main_flow = template_el.find("flow-layout") or template_el.find("grid-layout")
+                        is_template = True
+                        # Recupera il nome originale del template importato dall'XML
+                        t_name = template_el.get("name", "custom_template")
+            
+            if main_flow is None:
+                messagebox.showerror("Errore", "Impossibile trovare un layout radice valido (<flow-layout> o <grid-layout>)")
+                return
+            
+            self.prop_export_template.set(is_template)
+            # Sincronizza l'interfaccia inserendo il nome corretto nella Entry ed espandendo la visualizzazione
+            self.prop_template_name_entry.delete(0, tk.END)
+            self.prop_template_name_entry.insert(0, t_name)
+            self.toggle_template_name_visibility()
+            
+            l_type = "Grid Layout" if main_flow.tag == "grid-layout" else "Flow Layout"
+            l_id = main_flow.get("id")
+            if not l_id:
+                l_id = "root_flow"
+            
+            self.main_layout = UILayout(l_id, l_type, main_flow.get("rows", "2"), main_flow.get("columns", "2"), direction=main_flow.get("direction", "vertical"))
+            
+            # --- FIX ELEMENT.TEXT CON HELPER SAFE_TEXT PER IL RADICE ---
+            p_node = main_flow.find("padding")
+            if p_node is not None:
+                all_node = p_node.find("all")
+                if all_node is not None:
+                    self.main_layout.padding_type = "all"
+                    self.main_layout.padding_all = safe_text(all_node, "0")
+                else:
+                    self.main_layout.padding_type = "individual"
+                    self.main_layout.padding_top = safe_text(p_node.find("top"), "0")
+                    self.main_layout.padding_bottom = safe_text(p_node.find("bottom"), "0")
+                    self.main_layout.padding_left = safe_text(p_node.find("left"), "0")
+                    self.main_layout.padding_right = safe_text(p_node.find("right"), "0")
+
+            m_node = main_flow.find("margins")
+            if m_node is not None:
+                all_node = m_node.find("all")
+                if all_node is not None:
+                    self.main_layout.margins_type = "all"
+                    self.main_layout.margins_all = safe_text(all_node, "0")
+                else:
+                    self.main_layout.margins_type = "individual"
+                    self.main_layout.margins_top = safe_text(m_node.find("top"), "0")
+                    self.main_layout.margins_bottom = safe_text(m_node.find("bottom"), "0")
+                    self.main_layout.margins_left = safe_text(m_node.find("left"), "0")
+                    self.main_layout.margins_right = safe_text(m_node.find("right"), "0")
+
+            sizing = main_flow.find("sizing")
+            if sizing is not None:
+                h_xml = sizing.find("horizontal")
+                if h_xml is not None:
+                    self.main_layout.width_method = h_xml.get("method", "content")
+                    self.main_layout.width_value = safe_text(h_xml, "100")
+                v_xml = sizing.find("vertical")
+                if v_xml is not None:
+                    self.main_layout.height_method = v_xml.get("method", "content")
+                    self.main_layout.height_value = safe_text(v_xml, "100")
+
             self.selected_component = self.main_layout
             
             main_children = main_flow.find("children")
@@ -744,49 +869,50 @@ class OwoQtDesigner:
                 l_id = f"layout_{self.layout_counter}"
                 self.layout_counter += 1
                 
-                sub_layout = UILayout(l_id, l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
+                sub_layout = UILayout(child.get("id", l_id), l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
                 
+                # --- FIX CON HELPER SAFE_TEXT PER I SOTTO LAYOUT RICORSIVI ---
                 p_node = child.find("padding")
                 if p_node is not None:
                     all_node = p_node.find("all")
                     if all_node is not None:
                         sub_layout.padding_type = "all"
-                        sub_layout.padding_all = all_node.text if all_node.text else "0"
+                        sub_layout.padding_all = safe_text(all_node, "0")
                     else:
                         sub_layout.padding_type = "individual"
-                        t = p_node.find("top"); sub_layout.padding_top = t.text if t is not None else "0"
-                        b = p_node.find("bottom"); sub_layout.padding_bottom = b.text if b is not None else "0"
-                        l = p_node.find("left"); sub_layout.padding_left = l.text if l is not None else "0"
-                        r = p_node.find("right"); sub_layout.padding_right = r.text if r is not None else "0"
+                        sub_layout.padding_top = safe_text(p_node.find("top"), "0")
+                        sub_layout.padding_bottom = safe_text(p_node.find("bottom"), "0")
+                        sub_layout.padding_left = safe_text(p_node.find("left"), "0")
+                        sub_layout.padding_right = safe_text(p_node.find("right"), "0")
 
                 m_node = child.find("margins")
                 if m_node is not None:
                     all_node = m_node.find("all")
                     if all_node is not None:
                         sub_layout.margins_type = "all"
-                        sub_layout.margins_all = all_node.text if all_node.text else "0"
+                        sub_layout.margins_all = safe_text(all_node, "0")
                     else:
                         sub_layout.margins_type = "individual"
-                        t = m_node.find("top"); sub_layout.margins_top = t.text if t is not None else "0"
-                        b = m_node.find("bottom"); sub_layout.margins_bottom = b.text if b is not None else "0"
-                        l = m_node.find("left"); sub_layout.margins_left = l.text if l is not None else "0"
-                        r = m_node.find("right"); sub_layout.margins_right = r.text if r is not None else "0"
+                        sub_layout.margins_top = safe_text(m_node.find("top"), "0")
+                        sub_layout.margins_bottom = safe_text(m_node.find("bottom"), "0")
+                        sub_layout.margins_left = safe_text(m_node.find("left"), "0")
+                        sub_layout.margins_right = safe_text(m_node.find("right"), "0")
 
                 h_align = child.find("horizontal-alignment")
-                if h_align is not None: sub_layout.horiz_align = h_align.text if h_align.text else "center"
+                if h_align is not None: sub_layout.horiz_align = safe_text(h_align, "center")
                 v_align = child.find("vertical-alignment")
-                if v_align is not None: sub_layout.vert_align = v_align.text if v_align.text else "center"
+                if v_align is not None: sub_layout.vert_align = safe_text(v_align, "center")
 
                 sizing = child.find("sizing")
                 if sizing is not None:
                     h_xml = sizing.find("horizontal")
                     if h_xml is not None:
                         sub_layout.width_method = h_xml.get("method", "content")
-                        sub_layout.width_value = h_xml.text if h_xml.text else "100"
+                        sub_layout.width_value = safe_text(h_xml, "100")
                     v_xml = sizing.find("vertical")
                     if v_xml is not None:
                         sub_layout.height_method = v_xml.get("method", "content")
-                        sub_layout.height_value = v_xml.text if v_xml.text else "100"
+                        sub_layout.height_value = safe_text(v_xml, "100")
                     
                 parent_obj.add_child(sub_layout)
                 inner_children = child.find("children")
@@ -796,55 +922,56 @@ class OwoQtDesigner:
                 w_id = child.get("id", f"{child.tag}_{self.widget_counter}")
                 self.widget_counter += 1
                 text_node = child.find("text")
-                w_text = text_node.text if text_node is not None else ""
+                w_text = safe_text(text_node, "")
                 
-                leaf_node = UIComponent(w_id, comp_type=child.tag, text=w_text)
+                leaf_node = UIComponent(child.get("id", w_id), comp_type=child.tag, text=w_text)
                 
+                # --- FIX CON HELPER SAFE_TEXT PER TUTTE LE COMPONENTI FOGLIA ---
                 p_node = child.find("padding")
                 if p_node is not None:
                     all_node = p_node.find("all")
                     if all_node is not None:
                         leaf_node.padding_type = "all"
-                        leaf_node.padding_all = all_node.text if all_node.text else "0"
+                        leaf_node.padding_all = safe_text(all_node, "0")
                     else:
                         leaf_node.padding_type = "individual"
-                        t = p_node.find("top"); leaf_node.padding_top = t.text if t is not None else "0"
-                        b = p_node.find("bottom"); leaf_node.padding_bottom = b.text if b is not None else "0"
-                        l = p_node.find("left"); leaf_node.padding_left = l.text if l is not None else "0"
-                        r = p_node.find("right"); leaf_node.padding_right = r.text if r is not None else "0"
+                        leaf_node.padding_top = safe_text(p_node.find("top"), "0")
+                        leaf_node.padding_bottom = safe_text(p_node.find("bottom"), "0")
+                        leaf_node.padding_left = safe_text(p_node.find("left"), "0")
+                        leaf_node.padding_right = safe_text(p_node.find("right"), "0")
 
                 m_node = child.find("margins")
                 if m_node is not None:
                     all_node = m_node.find("all")
                     if all_node is not None:
                         leaf_node.margins_type = "all"
-                        leaf_node.margins_all = all_node.text if all_node.text else "0"
+                        leaf_node.margins_all = safe_text(all_node, "0")
                     else:
                         leaf_node.margins_type = "individual"
-                        t = m_node.find("top"); leaf_node.margins_top = t.text if t is not None else "0"
-                        b = m_node.find("bottom"); leaf_node.margins_bottom = b.text if b is not None else "0"
-                        l = m_node.find("left"); leaf_node.margins_left = l.text if l is not None else "0"
-                        r = m_node.find("right"); leaf_node.margins_right = r.text if r is not None else "0"
+                        leaf_node.margins_top = safe_text(m_node.find("top"), "0")
+                        leaf_node.margins_bottom = safe_text(m_node.find("bottom"), "0")
+                        leaf_node.margins_left = safe_text(m_node.find("left"), "0")
+                        leaf_node.margins_right = safe_text(m_node.find("right"), "0")
 
                 if child.tag == "label":
                     sh = child.find("shadow")
-                    if sh is not None: leaf_node.label_shadow = sh.text if sh.text else "false"
+                    if sh is not None: leaf_node.label_shadow = safe_text(sh, "false")
                     mw = child.find("max-width")
-                    if mw is not None: leaf_node.label_max_width = mw.text if mw.text else ""
+                    if mw is not None: leaf_node.label_max_width = safe_text(mw, "")
                 elif child.tag == "box":
                     col = child.find("color")
-                    if col is not None: leaf_node.box_color = col.text if col.text else "#FF4CAF50"
+                    if col is not None: leaf_node.box_color = safe_text(col, "#FF4CAF50")
 
                 sizing = child.find("sizing")
                 if sizing is not None:
                     h_xml = sizing.find("horizontal")
                     if h_xml is not None:
                         leaf_node.width_method = h_xml.get("method", "content")
-                        leaf_node.width_value = h_xml.text if h_xml.text else "100"
+                        leaf_node.width_value = safe_text(h_xml, "100")
                     v_xml = sizing.find("vertical")
                     if v_xml is not None:
                         leaf_node.height_method = v_xml.get("method", "content")
-                        leaf_node.height_value = v_xml.text if v_xml.text else "20"
+                        leaf_node.height_value = safe_text(v_xml, "20")
                 
                 parent_obj.add_child(leaf_node)
 
