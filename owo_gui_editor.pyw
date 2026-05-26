@@ -53,13 +53,33 @@ class UIComponent:
         self.label_shadow = "false"
         self.label_max_width = ""
 
+        # Proprietà specifiche per text-box
+        self.text_box_max_length = ""
+
+        # Proprietà specifiche per text-area
+        self.text_area_max_length = ""
+        self.text_area_max_lines = ""
+        self.text_area_display_char_count = "false"
+
+        # Proprietà specifiche per box
+        self.box_color_mode = "single"
+        self.box_color = ""
+        self.box_start_color = ""
+        self.box_end_color = ""
+        self.box_fill = "false"
+        self.box_direction = "top-to-bottom"
+
+        # Proprietà specifiche per spacer
+        self.spacer_percent = ""
+
 class UILayout(UIComponent):
     def __init__(self, comp_id, layout_type="Flow Layout", rows="2", cols="2", direction="vertical"):
         super().__init__(comp_id, comp_type="layout")
-        self.layout_type = layout_type # "Flow Layout" oppure "Grid Layout"
+        self.layout_type = layout_type 
         self.rows = rows
         self.cols = cols
         self.direction = direction     # "vertical" oppure "horizontal"
+        self.expanded = "true"         
         self.children = []
         
         # I layout di default riempiono lo spazio assegnato
@@ -76,7 +96,7 @@ class UILayout(UIComponent):
         
         self.horiz_align = "center"
         self.vert_align = "center"
-        self.surface_type = "panel-dark" # 'panel-dark', 'vanilla-translucent', 'flat-black', 'none'
+        self.surface_type = "panel-dark" 
 
     def add_child(self, child):
         if child.parent:
@@ -170,13 +190,25 @@ class OwoQtDesigner:
         tk.Label(toolbox, text="Contenitori / Layouts", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
         tk.Button(toolbox, text="+ Flow Layout", command=lambda: self.add_layout_node("Flow Layout")).pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="+ Grid Layout", command=lambda: self.add_layout_node("Grid Layout")).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Stack Layout", command=lambda: self.add_layout_node("Stack Layout")).pack(fill=tk.X, padx=15, pady=2)
 
         tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
 
-        # MODIFICATO: Rimosse Spatola colore e Spunta checkbox dai pulsanti di inserimento
+        tk.Label(toolbox, text="Componenti Utility", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
+        tk.Button(toolbox, text="+ Scroll Container", command=lambda: self.add_layout_node("Scroll Container")).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Draggable Container", command=lambda: self.add_layout_node("Draggable Container")).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Collapsible Container", command=lambda: self.add_layout_node("Collapsible Container")).pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Dropdown Component", command=lambda: self.add_layout_node("Dropdown")).pack(fill=tk.X, padx=15, pady=2)
+
+        tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
+
         tk.Label(toolbox, text="Componenti Base (Foglia)", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
         tk.Button(toolbox, text="+ Bottone (button)", command=lambda: self.add_leaf_node("button", "A Button"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="+ Testo (label)", command=lambda: self.add_leaf_node("label", "Text Label"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Campo Testo (text-box)", command=lambda: self.add_leaf_node("text-box", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Area di Testo (text-area)", command=lambda: self.add_leaf_node("text-area", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Riquadro (box)", command=lambda: self.add_leaf_node("box", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
+        tk.Button(toolbox, text="+ Spaziatore (spacer)", command=lambda: self.add_leaf_node("spacer", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
 
     def toggle_template_name_visibility(self):
         """Mostra o nasconde l'entry del nome del template senza rompere il layout"""
@@ -211,9 +243,9 @@ class OwoQtDesigner:
         self.prop_id_entry = tk.Entry(self.id_frame)
         self.prop_id_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # 2. Modulo Testo (Visibile unicamente sotto l'ID per i componenti foglia)
+        # 2. Modulo Testo (Visibile unicamente sotto l'ID per i componenti foglia o collapsible)
         self.text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
-        tk.Label(self.text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=4)
+        tk.Label(self.text_frame, text="Contenuto Testo / Titolo:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
@@ -273,6 +305,16 @@ class OwoQtDesigner:
 
         # 6. Controlli Specifici Layout
         self.layout_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
+        
+        tk.Label(self.layout_extra_frame, text="Tipo Layout:", fg="white", bg=self.bg_panel, font=("Arial", 9, "bold")).pack(anchor=tk.W, pady=2)
+        self.prop_l_type = tk.StringVar(value="Flow Layout")
+        self.prop_l_type_menu = tk.OptionMenu(
+            self.layout_extra_frame, self.prop_l_type,
+            "Flow Layout", "Grid Layout", "Stack Layout", "Scroll Container", "Draggable Container", "Collapsible Container", "Dropdown",
+            command=self.on_layout_type_change
+        )
+        self.prop_l_type_menu.pack(fill=tk.X, pady=2)
+
         tk.Label(self.layout_extra_frame, text="Allineamento Orizzontale:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, pady=2)
         self.prop_l_horiz = tk.StringVar(value="center")
         tk.OptionMenu(self.layout_extra_frame, self.prop_l_horiz, "center", "left", "right").pack(fill=tk.X)
@@ -296,13 +338,51 @@ class OwoQtDesigner:
         tk.Label(self.grid_prop_frame, text="C:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT)
         self.prop_cols_entry = tk.Entry(self.grid_prop_frame, width=4); self.prop_cols_entry.pack(side=tk.LEFT, padx=4)
 
-        # 7. Controlli Specifici Foglie (MODIFICATO: rimosse le opzioni per il componente box color)
+        self.collapsible_prop_frame = tk.Frame(self.layout_extra_frame, bg=self.bg_panel)
+        tk.Label(self.collapsible_prop_frame, text="Espanso di default (expanded):", fg="#E91E63", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, pady=2)
+        self.prop_l_expanded = tk.StringVar(value="true")
+        tk.OptionMenu(self.collapsible_prop_frame, self.prop_l_expanded, "true", "false").pack(fill=tk.X)
+
+        # 7. Controlli Specifici Foglie
         self.leaf_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         self.label_shadow_label = tk.Label(self.leaf_extra_frame, text="Ombra Testo (Label shadow):", fg="white", bg=self.bg_panel)
         self.prop_l_shadow = tk.StringVar(value="false")
         self.label_shadow_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_l_shadow, "true", "false")
         self.label_mw_label = tk.Label(self.leaf_extra_frame, text="Larghezza Max Testo (Max-Width):", fg="white", bg=self.bg_panel)
         self.prop_l_mw = tk.Entry(self.leaf_extra_frame)
+
+        self.text_box_max_length_label = tk.Label(self.leaf_extra_frame, text="Lunghezza Max Input (max-length):", fg="white", bg=self.bg_panel)
+        self.prop_tb_max_length = tk.Entry(self.leaf_extra_frame)
+
+        # text-area widgets
+        self.text_area_max_length_label = tk.Label(self.leaf_extra_frame, text="Lunghezza Max (max-length):", fg="white", bg=self.bg_panel)
+        self.prop_ta_max_length = tk.Entry(self.leaf_extra_frame)
+        self.text_area_max_lines_label = tk.Label(self.leaf_extra_frame, text="Righe Max (max-lines):", fg="white", bg=self.bg_panel)
+        self.prop_ta_max_lines = tk.Entry(self.leaf_extra_frame)
+        self.text_area_display_count_label = tk.Label(self.leaf_extra_frame, text="Mostra Contatore (display-char-count):", fg="white", bg=self.bg_panel)
+        self.prop_ta_display_count = tk.StringVar(value="false")
+        self.text_area_display_count_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_ta_display_count, "true", "false")
+
+        # box widgets
+        self.box_color_mode_label = tk.Label(self.leaf_extra_frame, text="Modalità Colore:", fg="white", bg=self.bg_panel)
+        self.prop_box_color_mode = tk.StringVar(value="single")
+        self.box_color_mode_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_box_color_mode, "single", "gradient", command=self.toggle_box_color_mode)
+        self.box_color_label = tk.Label(self.leaf_extra_frame, text="Colore (hex #AARRGGBB):", fg="white", bg=self.bg_panel)
+        self.prop_box_color = tk.Entry(self.leaf_extra_frame)
+        self.box_start_color_label = tk.Label(self.leaf_extra_frame, text="Colore Inizio:", fg="white", bg=self.bg_panel)
+        self.prop_box_start_color = tk.Entry(self.leaf_extra_frame)
+        self.box_end_color_label = tk.Label(self.leaf_extra_frame, text="Colore Fine:", fg="white", bg=self.bg_panel)
+        self.prop_box_end_color = tk.Entry(self.leaf_extra_frame)
+        self.box_fill_label = tk.Label(self.leaf_extra_frame, text="Riempi (fill):", fg="white", bg=self.bg_panel)
+        self.prop_box_fill = tk.StringVar(value="false")
+        self.box_fill_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_box_fill, "true", "false")
+        self.box_direction_label = tk.Label(self.leaf_extra_frame, text="Direzione Gradiente (direction):", fg="white", bg=self.bg_panel)
+        self.prop_box_direction = tk.StringVar(value="top-to-bottom")
+        self.box_direction_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_box_direction, "top-to-bottom", "left-to-right", "right-to-left", "bottom-to-top")
+
+        # spacer widgets
+        self.spacer_percent_label = tk.Label(self.leaf_extra_frame, text="Percentuale (percent):", fg="white", bg=self.bg_panel)
+        self.prop_spacer_percent = tk.Entry(self.leaf_extra_frame)
 
         # 8. Bottoni d'Azione (Sempre visibili fissati in basso)
         self.actions_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
@@ -328,6 +408,44 @@ class OwoQtDesigner:
             self.margin_all_frame.pack_forget()
             self.margin_indiv_frame.pack(fill=tk.X, pady=2)
 
+    def _hide_leaf_extras_except(self, keep):
+        if "label" not in keep:
+            self.label_shadow_label.pack_forget(); self.label_shadow_menu.pack_forget()
+            self.label_mw_label.pack_forget(); self.prop_l_mw.pack_forget()
+        if "text-box" not in keep:
+            self.text_box_max_length_label.pack_forget(); self.prop_tb_max_length.pack_forget()
+        if "text-area" not in keep:
+            self.text_area_max_length_label.pack_forget(); self.prop_ta_max_length.pack_forget()
+            self.text_area_max_lines_label.pack_forget(); self.prop_ta_max_lines.pack_forget()
+            self.text_area_display_count_label.pack_forget(); self.text_area_display_count_menu.pack_forget()
+        if "box" not in keep:
+            self.box_color_mode_label.pack_forget(); self.box_color_mode_menu.pack_forget()
+            self.box_color_label.pack_forget(); self.prop_box_color.pack_forget()
+            self.box_start_color_label.pack_forget(); self.prop_box_start_color.pack_forget()
+            self.box_end_color_label.pack_forget(); self.prop_box_end_color.pack_forget()
+            self.box_fill_label.pack_forget(); self.box_fill_menu.pack_forget()
+            self.box_direction_label.pack_forget(); self.box_direction_menu.pack_forget()
+        if "spacer" not in keep:
+            self.spacer_percent_label.pack_forget(); self.prop_spacer_percent.pack_forget()
+
+    def toggle_box_color_mode(self, val):
+        if val == "single":
+            self.box_start_color_label.pack_forget(); self.prop_box_start_color.pack_forget()
+            self.box_end_color_label.pack_forget(); self.prop_box_end_color.pack_forget()
+            self.box_direction_label.pack_forget(); self.box_direction_menu.pack_forget()
+            self.box_color_label.pack(anchor=tk.W); self.prop_box_color.pack(fill=tk.X)
+        else:
+            self.box_color_label.pack_forget(); self.prop_box_color.pack_forget()
+            self.box_start_color_label.pack(anchor=tk.W); self.prop_box_start_color.pack(fill=tk.X)
+            self.box_end_color_label.pack(anchor=tk.W); self.prop_box_end_color.pack(fill=tk.X)
+            self.box_direction_label.pack(anchor=tk.W); self.box_direction_menu.pack(fill=tk.X)
+
+    def on_layout_type_change(self, val):
+        """Nasconde o mostra dinamicamente i campi specifici quando si cambia tipo di layout"""
+        if self.selected_component and isinstance(self.selected_component, UILayout):
+            self.selected_component.layout_type = val
+            self.show_property_editor(self.selected_component)
+
     # =====================================================================
     # MOTORE GERARCHICO DI CALCOLO DELLE BOUNDS (AUTO-SNAPPING)
     # =====================================================================
@@ -346,17 +464,36 @@ class OwoQtDesigner:
         
         if self.selected_component:
             display_name = self.selected_component.id
-            display_type = f"{self.selected_component.layout_type} ({self.selected_component.direction})" if isinstance(self.selected_component, UILayout) else self.selected_component.type
+            if isinstance(self.selected_component, UILayout):
+                if self.selected_component.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container"]:
+                    display_type = f"{self.selected_component.layout_type} ({self.selected_component.direction})"
+                else:
+                    display_type = self.selected_component.layout_type
+            else:
+                display_type = self.selected_component.type
             self.target_label.config(text=f"Selezionato: {display_name} ({display_type})", fg=self.accent_blue)
 
     def render_layout_recursive(self, layout, x1, y1, x2, y2):
         is_root = (layout.id == "root_flow")
-        color = "#FF9800" if layout.layout_type == "Flow Layout" else "#9C27B0"
+        
+        colors_map = {
+            "Flow Layout": "#FF9800",
+            "Grid Layout": "#9C27B0",
+            "Stack Layout": "#FF5722",
+            "Scroll Container": "#00BCD4",
+            "Draggable Container": "#4CAF50",
+            "Collapsible Container": "#E91E63",
+            "Dropdown": "#607D8B"
+        }
+        color = colors_map.get(layout.layout_type, "#FF9800")
         if self.selected_component == layout and not is_root: color = self.accent_blue
         
         if not is_root:
             self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=2, dash=(3, 3), tags=f"click_{layout.id}")
-            self.canvas.create_text(x1+5, y1+10, text=f"{layout.id} [{layout.layout_type} ({layout.direction})]", fill=color, font=("Arial", 8, "bold"), anchor=tk.W)
+            display_info = f"{layout.id} [{layout.layout_type}]"
+            if layout.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container", "Stack Layout"]:
+                display_info += f" ({layout.direction})"
+            self.canvas.create_text(x1+5, y1+10, text=display_info, fill=color, font=("Arial", 8, "bold"), anchor=tk.W)
             
         layout.bounds = (int(x1), int(y1), int(x2), int(y2))
         if not layout.children: return
@@ -365,15 +502,20 @@ class OwoQtDesigner:
         for i, child in enumerate(layout.children):
             cx1, cy1, cx2, cy2 = x1, y1, x2, y2
 
-            if layout.layout_type == "Flow Layout" and layout.direction == "vertical":
+            if layout.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container"] and layout.direction == "vertical":
                 slot_h = (y2 - y1) / num_children
                 cx1, cy1 = x1 + 10, y1 + (i * slot_h) + 12
                 cx2, cy2 = x2 - 10, y1 + ((i + 1) * slot_h) - 8
-            elif layout.layout_type == "Flow Layout" and layout.direction == "horizontal":
+            elif layout.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container"] and layout.direction == "horizontal":
                 slot_w = (x2 - x1) / num_children
                 cx1, cy1 = x1 + (i * slot_w) + 10, y1 + 12
                 cx2, cy2 = x1 + ((i + 1) * slot_w) - 10, y2 - 8
-            elif layout.layout_type == "Grid Layout":
+            else: 
+                slot_h = (y2 - y1) / num_children
+                cx1, cy1 = x1 + 10, y1 + (i * slot_h) + 12
+                cx2, cy2 = x2 - 10, y1 + ((i + 1) * slot_h) - 8
+
+            if layout.layout_type == "Grid Layout":
                 try:
                     r_max, c_max = max(1, int(layout.rows)), max(1, int(layout.cols))
                 except ValueError:
@@ -388,9 +530,8 @@ class OwoQtDesigner:
             if isinstance(child, UILayout):
                 self.render_layout_recursive(child, cx1, cy1, cx2, cy2)
             elif isinstance(child, UIComponent):
-                # MODIFICATO: Rimosse mappature colori box e checkbox obsolete
-                colors = {"button": "#3a3a3a", "label": "#151515"}
-                outlines = {"button": "#fff", "label": "#555"}
+                colors = {"button": "#3a3a3a", "label": "#151515", "text-box": "#1a2a3a", "text-area": "#1a2a1a", "box": "#2a1a1a", "spacer": "#252525"}
+                outlines = {"button": "#fff", "label": "#555", "text-box": "#4FC3F7", "text-area": "#81C784", "box": "#FF7043", "spacer": "#888"}
                 
                 b_color = colors.get(child.type, "#3a3a3a") if self.selected_component != child else "#555"
                 o_color = outlines.get(child.type, "#fff") if self.selected_component != child else self.accent_blue
@@ -411,7 +552,6 @@ class OwoQtDesigner:
 
         clicked_tags = self.canvas.find_withtag(tk.CURRENT)
         if not clicked_tags:
-            # Cliccare sul vuoto dello sfondo seleziona ed edita il root_flow
             self.selected_component = self.main_layout
             self.show_property_editor(self.main_layout)
             self.rebuild_and_snap()
@@ -520,7 +660,7 @@ class OwoQtDesigner:
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR STRUTTURATO (ID E TESTO CORRETTI E COERENTI)
+    # PROPERTY EDITOR STRUTTURATO (ID E TESTO IN CIMA CORRETTI)
     # =====================================================================
 
     def show_property_editor(self, comp):
@@ -531,8 +671,9 @@ class OwoQtDesigner:
         self.id_frame.pack(fill=tk.X)
         self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
 
-        # Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
-        if not isinstance(comp, UILayout):
+        # Mostra testo solo per foglie che lo supportano, o per Collapsible Container
+        if (isinstance(comp, UILayout) and comp.layout_type == "Collapsible Container") or \
+           (not isinstance(comp, UILayout) and comp.type not in ["spacer", "box"]):
             self.text_frame.pack(fill=tk.X)
             self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
 
@@ -545,31 +686,69 @@ class OwoQtDesigner:
             # Se è un layout monta le opzioni di allineamento e superficie extra
             self.layout_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
+            self.prop_l_type.set(comp.layout_type)
             self.prop_l_horiz.set(comp.horiz_align)
             self.prop_l_vert.set(comp.vert_align)
             self.prop_l_surface.set(comp.surface_type)
             
-            if comp.layout_type == "Flow Layout":
+            self.prop_l_direction.set(comp.direction)
+            self.prop_l_expanded.set(comp.expanded)
+            
+            self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
+            self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
+            
+            # Svuota i moduli specifici prima di iniettare quelli coerenti al tipo selezionato
+            self.flow_prop_frame.pack_forget()
+            self.grid_prop_frame.pack_forget()
+            self.collapsible_prop_frame.pack_forget()
+            
+            if comp.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container"]:
                 self.flow_prop_frame.pack(fill=tk.X, pady=4)
-                self.grid_prop_frame.pack_forget()
-                self.prop_l_direction.set(comp.direction)
-            elif comp.layout_type == "Grid Layout":
+            if comp.layout_type == "Grid Layout":
                 self.grid_prop_frame.pack(fill=tk.X, pady=4)
-                self.flow_prop_frame.pack_forget()
-                self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
-                self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
+            if comp.layout_type == "Collapsible Container":
+                self.collapsible_prop_frame.pack(fill=tk.X, pady=4)
         else:
-            # Per le foglie, attiva il modulo opzioni avanzate del widget (MODIFICATO: rimosse logiche box)
+            # Per le foglie, attiva il modulo opzioni avanzate del widget
             self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
             if comp.type == "label":
+                self._hide_leaf_extras_except(["label"])
                 self.label_shadow_label.pack(anchor=tk.W); self.label_shadow_menu.pack(fill=tk.X)
                 self.label_mw_label.pack(anchor=tk.W); self.prop_l_mw.pack(fill=tk.X)
                 self.prop_l_shadow.set(comp.label_shadow)
                 self.prop_l_mw.delete(0, tk.END); self.prop_l_mw.insert(0, comp.label_max_width)
-            else:
+            elif comp.type == "text-box":
                 self.label_shadow_label.pack_forget(); self.label_shadow_menu.pack_forget()
                 self.label_mw_label.pack_forget(); self.prop_l_mw.pack_forget()
+                self.text_box_max_length_label.pack(anchor=tk.W); self.prop_tb_max_length.pack(fill=tk.X)
+                self.prop_tb_max_length.delete(0, tk.END); self.prop_tb_max_length.insert(0, comp.text_box_max_length)
+                self._hide_leaf_extras_except(["text-box"])
+            elif comp.type == "text-area":
+                self._hide_leaf_extras_except(["text-area"])
+                self.text_area_max_length_label.pack(anchor=tk.W); self.prop_ta_max_length.pack(fill=tk.X)
+                self.text_area_max_lines_label.pack(anchor=tk.W); self.prop_ta_max_lines.pack(fill=tk.X)
+                self.text_area_display_count_label.pack(anchor=tk.W); self.text_area_display_count_menu.pack(fill=tk.X)
+                self.prop_ta_max_length.delete(0, tk.END); self.prop_ta_max_length.insert(0, comp.text_area_max_length)
+                self.prop_ta_max_lines.delete(0, tk.END); self.prop_ta_max_lines.insert(0, comp.text_area_max_lines)
+                self.prop_ta_display_count.set(comp.text_area_display_char_count)
+            elif comp.type == "box":
+                self._hide_leaf_extras_except(["box"])
+                self.box_color_mode_label.pack(anchor=tk.W); self.box_color_mode_menu.pack(fill=tk.X)
+                self.prop_box_color_mode.set(comp.box_color_mode)
+                self.box_fill_label.pack(anchor=tk.W); self.box_fill_menu.pack(fill=tk.X)
+                self.prop_box_fill.set(comp.box_fill)
+                self.toggle_box_color_mode(comp.box_color_mode)
+                self.prop_box_color.delete(0, tk.END); self.prop_box_color.insert(0, comp.box_color)
+                self.prop_box_start_color.delete(0, tk.END); self.prop_box_start_color.insert(0, comp.box_start_color)
+                self.prop_box_end_color.delete(0, tk.END); self.prop_box_end_color.insert(0, comp.box_end_color)
+                self.prop_box_direction.set(comp.box_direction)
+            elif comp.type == "spacer":
+                self._hide_leaf_extras_except(["spacer"])
+                self.spacer_percent_label.pack(anchor=tk.W); self.prop_spacer_percent.pack(fill=tk.X)
+                self.prop_spacer_percent.delete(0, tk.END); self.prop_spacer_percent.insert(0, comp.spacer_percent)
+            else:
+                self._hide_leaf_extras_except([])
 
         # 4. Sincronizzazione delle variabili geometriche con i dati correnti del modello
         self.prop_w_method.set(comp.width_method)
@@ -614,7 +793,7 @@ class OwoQtDesigner:
             return
         self.selected_component.id = new_id
         
-        if not isinstance(self.selected_component, UILayout):
+        if not isinstance(self.selected_component, UILayout) and self.selected_component.type not in ["spacer", "box"]:
             self.selected_component.text = self.prop_text_entry.get()
             
         self.selected_component.width_method = self.prop_w_method.get()
@@ -637,19 +816,38 @@ class OwoQtDesigner:
         self.selected_component.margins_right = self.prop_margin_right.get()
         
         if isinstance(self.selected_component, UILayout):
+            self.selected_component.layout_type = self.prop_l_type.get()
             self.selected_component.horiz_align = self.prop_l_horiz.get()
             self.selected_component.vert_align = self.prop_l_vert.get()
             self.selected_component.surface_type = self.prop_l_surface.get()
             
-            if self.selected_component.layout_type == "Flow Layout":
+            if self.selected_component.layout_type in ["Flow Layout", "Scroll Container", "Collapsible Container"]:
                 self.selected_component.direction = self.prop_l_direction.get()
-            elif self.selected_component.layout_type == "Grid Layout":
+            if self.selected_component.layout_type == "Grid Layout":
                 self.selected_component.rows = self.prop_rows_entry.get()
                 self.selected_component.cols = self.prop_cols_entry.get()
+            if self.selected_component.layout_type == "Collapsible Container":
+                self.selected_component.expanded = self.prop_l_expanded.get()
+                self.selected_component.text = self.prop_text_entry.get() 
         else:
             if self.selected_component.type == "label":
                 self.selected_component.label_shadow = self.prop_l_shadow.get()
                 self.selected_component.label_max_width = self.prop_l_mw.get()
+            elif self.selected_component.type == "text-box":
+                self.selected_component.text_box_max_length = self.prop_tb_max_length.get()
+            elif self.selected_component.type == "text-area":
+                self.selected_component.text_area_max_length = self.prop_ta_max_length.get()
+                self.selected_component.text_area_max_lines = self.prop_ta_max_lines.get()
+                self.selected_component.text_area_display_char_count = self.prop_ta_display_count.get()
+            elif self.selected_component.type == "box":
+                self.selected_component.box_color_mode = self.prop_box_color_mode.get()
+                self.selected_component.box_color = self.prop_box_color.get()
+                self.selected_component.box_start_color = self.prop_box_start_color.get()
+                self.selected_component.box_end_color = self.prop_box_end_color.get()
+                self.selected_component.box_fill = self.prop_box_fill.get()
+                self.selected_component.box_direction = self.prop_box_direction.get()
+            elif self.selected_component.type == "spacer":
+                self.selected_component.spacer_percent = self.prop_spacer_percent.get()
                 
         self.rebuild_and_snap()
 
@@ -692,8 +890,11 @@ class OwoQtDesigner:
             with open(file_path, "w", encoding="utf-8") as f: f.write(pretty_xml)
             messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
 
-    def serialize_node_recursive(self, xml_parent, obj):
-        attrs = {"id": obj.id} 
+    def serialize_node_recursive(self, xml_parent, obj, grid_pos=None):
+        attrs = {"id": obj.id}
+        if grid_pos is not None:
+            attrs["row"] = str(grid_pos[0])
+            attrs["column"] = str(grid_pos[1]) 
         if isinstance(obj, UILayout):
             if obj.layout_type == "Flow Layout":
                 tag = "flow-layout"
@@ -702,21 +903,66 @@ class OwoQtDesigner:
                 tag = "grid-layout"
                 attrs["rows"] = obj.rows
                 attrs["columns"] = obj.cols
+            elif obj.layout_type == "Scroll Container":
+                tag = "scroll"
+                attrs["direction"] = obj.direction
+            elif obj.layout_type == "Draggable Container":
+                tag = "drag"
+            elif obj.layout_type == "Collapsible Container":
+                tag = "collapsible"
+                attrs["direction"] = obj.direction
+                attrs["expanded"] = obj.expanded
+            elif obj.layout_type == "Stack Layout":
+                tag = "stack-layout"
+            elif obj.layout_type == "Dropdown":
+                tag = "dropdown"
             else:
                 return
         else:
             tag = obj.type
+            if tag == "spacer" and obj.spacer_percent:
+                attrs["percent"] = obj.spacer_percent
 
         node = ET.SubElement(xml_parent, tag, attrs)
         
         if isinstance(obj, UILayout) and obj.children:
-            children_container = ET.SubElement(node, "children")
-            for child in obj.children:
-                self.serialize_node_recursive(children_container, child)
+            # CORREZIONE COMPATIBILITÀ: scroll e drag NON usano il raggruppatore visivo <children>
+            if obj.layout_type in ["Scroll Container", "Draggable Container"]:
+                if obj.children:
+                    self.serialize_node_recursive(node, obj.children[0])
+            elif obj.layout_type == "Grid Layout":
+                children_container = ET.SubElement(node, "children")
+                try:
+                    cols = max(1, int(obj.cols))
+                except ValueError:
+                    cols = 2
+                for i, child in enumerate(obj.children):
+                    self.serialize_node_recursive(children_container, child, grid_pos=(i // cols, i % cols))
+            else:
+                children_container = ET.SubElement(node, "children")
+                for child in obj.children:
+                    self.serialize_node_recursive(children_container, child)
 
-        # MODIFICATO: Rimosso blocco di serializzazione box e checkbox
-        if tag in ["button", "label"] and obj.text:
+        if tag in ["button", "label", "collapsible", "text-box"] and obj.text:
             ET.SubElement(node, "text").text = obj.text
+
+        if tag == "text-box" and obj.text_box_max_length:
+            ET.SubElement(node, "max-length").text = obj.text_box_max_length
+
+        if tag == "text-area":
+            if obj.text: ET.SubElement(node, "text").text = obj.text
+            if obj.text_area_max_length: ET.SubElement(node, "max-length").text = obj.text_area_max_length
+            if obj.text_area_max_lines: ET.SubElement(node, "max-lines").text = obj.text_area_max_lines
+            if obj.text_area_display_char_count == "true": ET.SubElement(node, "display-char-count").text = "true"
+
+        if tag == "box":
+            if obj.box_color_mode == "single":
+                if obj.box_color: ET.SubElement(node, "color").text = obj.box_color
+            else:
+                if obj.box_start_color: ET.SubElement(node, "start-color").text = obj.box_start_color
+                if obj.box_end_color: ET.SubElement(node, "end-color").text = obj.box_end_color
+                if obj.box_direction != "top-to-bottom": ET.SubElement(node, "direction").text = obj.box_direction
+            if obj.box_fill == "true": ET.SubElement(node, "fill").text = "true"
 
         if tag == "label":
             if obj.label_shadow == "true": ET.SubElement(node, "shadow").text = "true"
@@ -786,18 +1032,18 @@ class OwoQtDesigner:
             t_name = "custom_template"
             
             if components is not None:
-                main_flow = components.find("flow-layout") or components.find("grid-layout")
+                main_flow = components.find("flow-layout") or components.find("grid-layout") or components.find("scroll") or components.find("drag") or components.find("collapsible") or components.find("dropdown")
             else:
                 templates = root.find("templates")
                 if templates is not None:
                     template_el = templates.find("template")
                     if template_el is not None:
-                        main_flow = template_el.find("flow-layout") or template_el.find("grid-layout")
+                        main_flow = template_el.find("flow-layout") or template_el.find("grid-layout") or template_el.find("scroll") or template_el.find("drag") or template_el.find("collapsible") or template_el.find("dropdown")
                         is_template = True
                         t_name = template_el.get("name", "custom_template")
             
             if main_flow is None:
-                messagebox.showerror("Errore", "Impossibile trovare un layout radice valido (<flow-layout> o <grid-layout>)")
+                messagebox.showerror("Errore", "Impossibile trovare un layout radice valido (<flow-layout>, <grid-layout> o <scroll/drag/collapsible/dropdown>)")
                 return
             
             self.prop_export_template.set(is_template)
@@ -805,13 +1051,32 @@ class OwoQtDesigner:
             self.prop_template_name_entry.insert(0, t_name)
             self.toggle_template_name_visibility()
             
-            l_type = "Grid Layout" if main_flow.tag == "grid-layout" else "Flow Layout"
+            if main_flow.tag == "grid-layout":
+                l_type = "Grid Layout"
+            elif main_flow.tag == "flow-layout":
+                l_type = "Flow Layout"
+            elif main_flow.tag == "scroll":
+                l_type = "Scroll Container"
+            elif main_flow.tag == "drag":
+                l_type = "Draggable Container"
+            elif main_flow.tag == "collapsible":
+                l_type = "Collapsible Container"
+            elif main_flow.tag == "dropdown":
+                l_type = "Dropdown"
+            else:
+                l_type = "Flow Layout"
+            
             l_id = main_flow.get("id")
             if not l_id:
                 l_id = "root_flow"
             
             self.main_layout = UILayout(l_id, l_type, main_flow.get("rows", "2"), main_flow.get("columns", "2"), direction=main_flow.get("direction", "vertical"))
             
+            if l_type == "Collapsible Container":
+                self.main_layout.expanded = main_flow.get("expanded", "true")
+                text_node = main_flow.find("text")
+                self.main_layout.text = safe_text(text_node, "")
+
             p_node = main_flow.find("padding")
             if p_node is not None:
                 all_node = p_node.find("all")
@@ -872,8 +1137,16 @@ class OwoQtDesigner:
             self.selected_component = self.main_layout
             self.show_property_editor(self.main_layout)
             
-            main_children = main_flow.find("children")
-            if main_children is not None: self.parse_xml_recursive(main_children, self.main_layout)
+            # CORREZIONE IMPORTER ROOT: Esegue il parse selettivo ignorando i tag fittizi dei wrapping parent
+            if l_type in ["Scroll Container", "Draggable Container"]:
+                for sub in main_flow:
+                    if sub.tag not in ["sizing", "margins", "padding", "surface", "text", "horizontal-alignment", "vertical-alignment"]:
+                        self.parse_xml_recursive([sub], self.main_layout)
+                        break
+            else:
+                main_children = main_flow.find("children")
+                if main_children is not None: self.parse_xml_recursive(main_children, self.main_layout)
+                
             self.rebuild_and_snap()
             messagebox.showinfo("Importato", "File XML importato correttamente!")
         except Exception as e:
@@ -881,14 +1154,35 @@ class OwoQtDesigner:
 
     def parse_xml_recursive(self, xml_children, parent_obj):
         for child in xml_children:
-            if child.tag in ["flow-layout", "grid-layout"]:
-                l_type = "Grid Layout" if child.tag == "grid-layout" else "Flow Layout"
+            if child.tag in ["flow-layout", "grid-layout", "stack-layout", "scroll", "drag", "collapsible", "dropdown"]:
+                if child.tag == "grid-layout":
+                    l_type = "Grid Layout"
+                elif child.tag == "flow-layout":
+                    l_type = "Flow Layout"
+                elif child.tag == "scroll":
+                    l_type = "Scroll Container"
+                elif child.tag == "drag":
+                    l_type = "Draggable Container"
+                elif child.tag == "collapsible":
+                    l_type = "Collapsible Container"
+                elif child.tag == "stack-layout":
+                    l_type = "Stack Layout"
+                elif child.tag == "dropdown":
+                    l_type = "Dropdown"
+                else:
+                    l_type = "Flow Layout"
+                
                 l_id = child.get("id", f"layout_{self.layout_counter}")
                 if f"layout_{self.layout_counter}" == l_id:
                     self.layout_counter += 1
                 
                 sub_layout = UILayout(l_id, l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
                 
+                if l_type == "Collapsible Container":
+                    sub_layout.expanded = child.get("expanded", "true")
+                    text_node = child.find("text")
+                    sub_layout.text = safe_text(text_node, "")
+
                 p_node = child.find("padding")
                 if p_node is not None:
                     all_node = p_node.find("all")
@@ -945,11 +1239,18 @@ class OwoQtDesigner:
                     sub_layout.surface_type = "none"
                     
                 parent_obj.add_child(sub_layout)
-                inner_children = child.find("children")
-                if inner_children is not None: self.parse_xml_recursive(inner_children, sub_layout)
                 
-            # MODIFICATO: Rimosse box e checkbox dal parser ad albero gerarchico dei componenti foglia
-            elif child.tag in ["button", "label"]:
+                # CORREZIONE IMPORTER GERARCHICO: Parsa direttamente i tag interni saltando <children> se è scroll o drag
+                if l_type in ["Scroll Container", "Draggable Container"]:
+                    for sub in child:
+                        if sub.tag not in ["sizing", "margins", "padding", "surface", "text", "horizontal-alignment", "vertical-alignment", "children"]:
+                            self.parse_xml_recursive([sub], sub_layout)
+                            break
+                else:
+                    inner_children = child.find("children")
+                    if inner_children is not None: self.parse_xml_recursive(inner_children, sub_layout)
+                
+            elif child.tag in ["button", "label", "text-box", "text-area", "box", "spacer"]:
                 w_id = child.get("id", f"{child.tag}_{self.widget_counter}")
                 if f"{child.tag}_{self.widget_counter}" == w_id:
                     self.widget_counter += 1
@@ -989,6 +1290,38 @@ class OwoQtDesigner:
                     if sh is not None: leaf_node.label_shadow = safe_text(sh, "false")
                     mw = child.find("max-width")
                     if mw is not None: leaf_node.label_max_width = safe_text(mw, "")
+
+                if child.tag == "text-box":
+                    ml = child.find("max-length")
+                    if ml is not None: leaf_node.text_box_max_length = safe_text(ml, "")
+
+                if child.tag == "text-area":
+                    ml = child.find("max-length")
+                    if ml is not None: leaf_node.text_area_max_length = safe_text(ml, "")
+                    mlines = child.find("max-lines")
+                    if mlines is not None: leaf_node.text_area_max_lines = safe_text(mlines, "")
+                    dc = child.find("display-char-count")
+                    if dc is not None: leaf_node.text_area_display_char_count = safe_text(dc, "false")
+
+                if child.tag == "box":
+                    color = child.find("color")
+                    if color is not None:
+                        leaf_node.box_color_mode = "single"
+                        leaf_node.box_color = safe_text(color, "")
+                    else:
+                        sc = child.find("start-color")
+                        ec = child.find("end-color")
+                        if sc is not None or ec is not None:
+                            leaf_node.box_color_mode = "gradient"
+                            if sc is not None: leaf_node.box_start_color = safe_text(sc, "")
+                            if ec is not None: leaf_node.box_end_color = safe_text(ec, "")
+                        d = child.find("direction")
+                        if d is not None: leaf_node.box_direction = safe_text(d, "top-to-bottom")
+                    fill = child.find("fill")
+                    if fill is not None: leaf_node.box_fill = safe_text(fill, "false")
+
+                if child.tag == "spacer":
+                    leaf_node.spacer_percent = child.get("percent", "")
 
                 sizing = child.find("sizing")
                 if sizing is not None:
