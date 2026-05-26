@@ -23,7 +23,7 @@ class UIComponent:
         self.text = text
         self.parent = None
         
-        # Annotazione esplicita per evitare eccezioni di tipo bounds
+        # Annotazione esplicita per evitare rigidità del type-checker
         self.bounds: tuple[int, int, int, int] = (0, 0, 0, 0)
         
         # Sizing ufficiale oωo-lib basato su sotto-tag e attributo method dell'XSD
@@ -32,7 +32,7 @@ class UIComponent:
         self.height_method = "content"  # 'content', 'fill', 'fixed'
         self.height_value = "20"
         
-        # Gestione avanzata del Padding per Faccia
+        # Gestione del Padding per Faccia
         self.padding_type = "all"       # 'all' oppure 'individual'
         self.padding_all = "0"
         self.padding_top = "0"
@@ -40,7 +40,7 @@ class UIComponent:
         self.padding_left = "0"
         self.padding_right = "0"
         
-        # Gestione avanzata dei Margini per Faccia
+        # Gestione dei Margini per Faccia
         self.margins_type = "all"       # 'all' oppure 'individual'
         self.margins_all = "0"
         self.margins_top = "0"
@@ -138,7 +138,7 @@ class OwoQtDesigner:
         tk.Button(toolbox, text="📂 Importa XML", bg="#FF9800", fg="white", command=self.import_xml).pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="💾 Esporta XML Valido", bg="#4CAF50", fg="white", command=self.export_xml).pack(fill=tk.X, padx=15, pady=2)
         
-        # Container fisso per i controlli del template (risolve il bug del pack sparito)
+        # Container fisso per i controlli del template (risolve il bug della sparizione)
         self.template_control_container = tk.Frame(toolbox, bg=self.bg_panel)
         self.template_control_container.pack(fill=tk.X, padx=15, pady=4)
 
@@ -201,35 +201,31 @@ class OwoQtDesigner:
         
         tk.Label(self.prop_panel, text="Property Editor", fg=self.fg_light, bg=self.bg_panel, font=("Arial", 12, "bold")).pack(pady=10)
         
-        # --- MODULO ID (Sempre stampato all'inizio per qualsiasi tipo di elemento!) ---
+        # 1. Modulo ID (Sempre visibile all'inizio se un elemento è selezionato)
         self.id_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
-        self.id_frame.pack(fill=tk.X)
         tk.Label(self.id_frame, text="Widget ID:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=2)
         self.prop_id_entry = tk.Entry(self.id_frame)
         self.prop_id_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # --- MODULO TESTO (Questo invece viene nascosto/mostrato dinamicamente) ---
+        # 2. Modulo Testo (Visibile unicamente per i componenti foglia)
         self.text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # Configurazione Sizing Larghezza (horizontal)
+        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale sotto lo stesso frame finto)
         self.sizing_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.sizing_frame, text="Metodo Orizzontale (horizontal):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_w_method = tk.StringVar(value="content")
         tk.OptionMenu(self.sizing_frame, self.prop_w_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
         self.prop_w_val = tk.Entry(self.sizing_frame); self.prop_w_val.pack(fill=tk.X, padx=15, pady=2)
 
-        # Configurazione Sizing Altezza (vertical)
-        self.sizing_frame_v = tk.Frame(self.prop_panel, bg=self.bg_panel)
-        self.sizing_frame_v.pack(fill=tk.X)
-        tk.Label(self.sizing_frame_v, text="Metodo Verticale (vertical):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
+        tk.Label(self.sizing_frame, text="Metodo Verticale (vertical):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_h_method = tk.StringVar(value="content")
-        tk.OptionMenu(self.sizing_frame_v, self.prop_h_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
-        self.prop_h_val = tk.Entry(self.sizing_frame_v); self.prop_h_val.pack(fill=tk.X, padx=15, pady=2)
+        tk.OptionMenu(self.sizing_frame, self.prop_h_method, "content", "fill", "fixed").pack(fill=tk.X, padx=15, pady=2)
+        self.prop_h_val = tk.Entry(self.sizing_frame); self.prop_h_val.pack(fill=tk.X, padx=15, pady=2)
 
-        # Contenitore Padding
+        # 4. Contenitore Padding
         self.padding_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.padding_frame, text="Tipo di Padding (Facciale):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_padding_type = tk.StringVar(value="all")
@@ -250,7 +246,7 @@ class OwoQtDesigner:
         tk.Label(self.pad_indiv_frame, text="R:", fg="white", bg=self.bg_panel).grid(row=1, column=2, padx=2, pady=2)
         self.prop_pad_right = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_right.grid(row=1, column=3, padx=2, pady=2)
 
-        # Contenitore Margins
+        # 5. Contenitore Margins
         self.margins_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.margins_frame, text="Tipo di Margini (Facciale):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_margins_type = tk.StringVar(value="all")
@@ -271,7 +267,7 @@ class OwoQtDesigner:
         tk.Label(self.margin_indiv_frame, text="R:", fg="white", bg=self.bg_panel).grid(row=1, column=2, padx=2, pady=2)
         self.prop_margin_right = tk.Entry(self.margin_indiv_frame, width=5); self.prop_margin_right.grid(row=1, column=3, padx=2, pady=2)
 
-        # Controlli Specifici Layout
+        # 6. Controlli Specifici Layout
         self.layout_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.layout_extra_frame, text="Allineamento Orizzontale:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, pady=2)
         self.prop_l_horiz = tk.StringVar(value="center")
@@ -296,7 +292,7 @@ class OwoQtDesigner:
         tk.Label(self.grid_prop_frame, text="C:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT)
         self.prop_cols_entry = tk.Entry(self.grid_prop_frame, width=4); self.prop_cols_entry.pack(side=tk.LEFT, padx=4)
 
-        # Controlli Specifici Foglie
+        # 7. Controlli Specifici Foglie
         self.leaf_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         self.label_shadow_label = tk.Label(self.leaf_extra_frame, text="Ombra Testo (Label shadow):", fg="white", bg=self.bg_panel)
         self.prop_l_shadow = tk.StringVar(value="false")
@@ -306,7 +302,7 @@ class OwoQtDesigner:
         self.box_color_label = tk.Label(self.leaf_extra_frame, text="Colore Sfondo Box (HEX):", fg="white", bg=self.bg_panel)
         self.prop_b_color = tk.Entry(self.leaf_extra_frame)
 
-        # Bottoni d'Azione (Fissati in basso)
+        # 8. Bottoni d'Azione (Sempre visibili fissati in basso)
         self.actions_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         self.actions_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
         tk.Button(self.actions_frame, text="✔️ Applica Proprietà", bg=self.accent_blue, fg="white", command=self.apply_properties).pack(fill=tk.X, padx=15, pady=5)
@@ -517,28 +513,29 @@ class OwoQtDesigner:
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR STRUTTURATO (ID INTEGRATO PER OGNI ELEMENTO)
+    # PROPERTY EDITOR STRUTTURATO (ID SEMPRE VISIBILE SE SELEZIONATO)
     # =====================================================================
 
     def show_property_editor(self, comp):
-        # 1. Smonta tutti i moduli visivi per ricalcolare l'ordine sequenziale pulito
-        self.id_frame.pack(fill=tk.X)
-        self.text_frame.pack_forget()
-        self.sizing_frame.pack_forget()
-        self.padding_frame.pack_forget()
-        self.margins_frame.pack_forget()
-        self.layout_extra_frame.pack_forget()
-        self.leaf_extra_frame.pack_forget()
+        # 1. Reset e smontaggio completo di tutti i moduli visivi
+        self.hide_property_editor()
 
-        # 2. L'ID adesso viene mostrato SEMPRE (Sia per Layout che per foglie!)
-        self.prop_id_entry.delete(0, tk.END)
-        self.prop_id_entry.insert(0, comp.id)
+        # 2. Montiamo l'id_frame ad albero per PRIMO, rendendo l'ID sempre visibile (Layout inclusi)
+        self.id_frame.pack(fill=tk.X)
+        self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
+
+        # AGGIORNAMENTO CORREZIONE: Se l'elemento è una foglia, agganciamo il modulo del testo SUBITO sotto l'ID
+        if not isinstance(comp, UILayout):
+            self.text_frame.pack(fill=tk.X)
+            self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
+
+        # 3. Attiviamo i blocchi comuni geometrici standard (Sizing compattato, Padding e Margini)
+        self.sizing_frame.pack(fill=tk.X)
+        self.padding_frame.pack(fill=tk.X)
+        self.margins_frame.pack(fill=tk.X)
 
         if isinstance(comp, UILayout):
-            # Se è un layout, attiva i sottomenu strutturali e di allineamento
-            self.sizing_frame.pack(fill=tk.X)
-            self.padding_frame.pack(fill=tk.X)
-            self.margins_frame.pack(fill=tk.X)
+            # Se è un layout monta solo le opzioni di allineamento e superficie extra
             self.layout_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
             self.prop_l_horiz.set(comp.horiz_align)
@@ -555,14 +552,8 @@ class OwoQtDesigner:
                 self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
                 self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
         else:
-            # Per le foglie (pulsanti, scritte) ripristina e popola la casella del testo
-            self.text_frame.pack(fill=tk.X)
-            self.sizing_frame.pack(fill=tk.X)
-            self.padding_frame.pack(fill=tk.X)
-            self.margins_frame.pack(fill=tk.X)
+            # Per le foglie, attiva il modulo opzioni avanzate del widget (Testo e ID sono già sopra fisse)
             self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
-            
-            self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
             
             if comp.type == "label":
                 self.label_shadow_label.pack(anchor=tk.W); self.label_shadow_menu.pack(fill=tk.X)
@@ -579,7 +570,7 @@ class OwoQtDesigner:
             else:
                 self.box_color_label.pack_forget(); self.prop_b_color.pack_forget()
 
-        # 3. Carica i dati comuni relativi a Sizing, Padding e Margini
+        # 4. Sincronizzazione delle variabili logiche con i dati correnti del modello
         self.prop_w_method.set(comp.width_method)
         self.prop_w_val.delete(0, tk.END); self.prop_w_val.insert(0, comp.width_value)
         self.prop_h_method.set(comp.height_method)
@@ -602,6 +593,7 @@ class OwoQtDesigner:
         self.toggle_margins_views(comp.margins_type)
 
     def hide_property_editor(self):
+        """Smonta in blocco e pulisce l'intero pannello quando non c'è selezione attiva"""
         self.id_frame.pack_forget()
         self.text_frame.pack_forget()
         self.sizing_frame.pack_forget()
@@ -613,7 +605,7 @@ class OwoQtDesigner:
     def apply_properties(self):
         if not self.selected_component: return
         
-        # Validazione e cambio dell'ID applicata globalmente a tutti i nodi (Layout e foglie inclusi)
+        # Validazione e applicazione dell'ID valida estesa per TUTTI gli elementi (Layout inclusi)
         new_id = self.prop_id_entry.get().strip().replace(" ", "_")
         if not new_id: return
         if new_id != self.selected_component.id and self.find_component_by_id(self.main_layout, new_id) is not None:
@@ -663,7 +655,7 @@ class OwoQtDesigner:
         self.rebuild_and_snap()
 
 # =====================================================================
-# EXPORT XML / IMPORT XML VALIDATO AD ALBERO XSD
+# SEZIONE EXPORT XML / IMPORT XML VALIDATO AD ALBERO XSD
 # =====================================================================
 
     def export_xml(self):
@@ -672,7 +664,6 @@ class OwoQtDesigner:
             "xsi:noNamespaceSchemaLocation": "https://raw.githubusercontent.com/wisp-forest/owo-lib/1.20/owo-ui.xsd"
         })
         
-        # Scelta dinamica della struttura principale (Templates vs Components)
         if self.prop_export_template.get():
             templates_node = ET.SubElement(owo_ui, "templates")
             template_name = self.prop_template_name_entry.get().strip().replace(" ", "_")
@@ -693,12 +684,15 @@ class OwoQtDesigner:
             messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
 
     def serialize_node_recursive(self, xml_parent, obj):
-        attrs = {"id": obj.id} # Iniezione dell'attributo id nativo per ogni blocco (layout inclusi)
+        attrs = {"id": obj.id} # Esporta l'id nativamente per TUTTI i nodi, inclusi i layout
         if isinstance(obj, UILayout):
             if obj.layout_type == "Flow Layout":
-                tag, attrs["direction"] = "flow-layout", obj.direction
+                tag = "flow-layout"
+                attrs["direction"] = obj.direction
             elif obj.layout_type == "Grid Layout":
-                tag, attrs["rows"], attrs["columns"] = "grid-layout", obj.rows, obj.cols
+                tag = "grid-layout"
+                attrs["rows"] = obj.rows
+                attrs["columns"] = obj.cols
             else:
                 return
         else:
@@ -795,7 +789,6 @@ class OwoQtDesigner:
                     if template_el is not None:
                         main_flow = template_el.find("flow-layout") or template_el.find("grid-layout")
                         is_template = True
-                        # Recupera il nome originale del template importato dall'XML
                         t_name = template_el.get("name", "custom_template")
             
             if main_flow is None:
@@ -803,7 +796,6 @@ class OwoQtDesigner:
                 return
             
             self.prop_export_template.set(is_template)
-            # Sincronizza l'interfaccia inserendo il nome corretto nella Entry ed espandendo la visualizzazione
             self.prop_template_name_entry.delete(0, tk.END)
             self.prop_template_name_entry.insert(0, t_name)
             self.toggle_template_name_visibility()
@@ -815,7 +807,6 @@ class OwoQtDesigner:
             
             self.main_layout = UILayout(l_id, l_type, main_flow.get("rows", "2"), main_flow.get("columns", "2"), direction=main_flow.get("direction", "vertical"))
             
-            # --- FIX ELEMENT.TEXT CON HELPER SAFE_TEXT PER IL RADICE ---
             p_node = main_flow.find("padding")
             if p_node is not None:
                 all_node = p_node.find("all")
@@ -866,12 +857,12 @@ class OwoQtDesigner:
         for child in xml_children:
             if child.tag in ["flow-layout", "grid-layout"]:
                 l_type = "Grid Layout" if child.tag == "grid-layout" else "Flow Layout"
-                l_id = f"layout_{self.layout_counter}"
-                self.layout_counter += 1
+                l_id = child.get("id", f"layout_{self.layout_counter}")
+                if f"layout_{self.layout_counter}" == l_id:
+                    self.layout_counter += 1
                 
-                sub_layout = UILayout(child.get("id", l_id), l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
+                sub_layout = UILayout(l_id, l_type, child.get("rows", "2"), child.get("columns", "2"), direction=child.get("direction", "vertical"))
                 
-                # --- FIX CON HELPER SAFE_TEXT PER I SOTTO LAYOUT RICORSIVI ---
                 p_node = child.find("padding")
                 if p_node is not None:
                     all_node = p_node.find("all")
@@ -920,13 +911,13 @@ class OwoQtDesigner:
                 
             elif child.tag in ["button", "label", "box", "checkbox"]:
                 w_id = child.get("id", f"{child.tag}_{self.widget_counter}")
-                self.widget_counter += 1
+                if f"{child.tag}_{self.widget_counter}" == w_id:
+                    self.widget_counter += 1
                 text_node = child.find("text")
                 w_text = safe_text(text_node, "")
                 
-                leaf_node = UIComponent(child.get("id", w_id), comp_type=child.tag, text=w_text)
+                leaf_node = UIComponent(w_id, comp_type=child.tag, text=w_text)
                 
-                # --- FIX CON HELPER SAFE_TEXT PER TUTTE LE COMPONENTI FOGLIA ---
                 p_node = child.find("padding")
                 if p_node is not None:
                     all_node = p_node.find("all")
