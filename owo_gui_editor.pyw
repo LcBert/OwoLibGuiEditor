@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import os  # AGGIUNTO: Necessario per la gestione dei percorsi e nomi dei file
+import os
 
 # =====================================================================
 # FUNZIONE DI UTILITY PER IL COMFORT DEL TYPE-CHECKER
@@ -20,7 +20,7 @@ def safe_text(node: ET.Element | None, default: str = "0") -> str:
 class UIComponent:
     def __init__(self, comp_id, comp_type="button", text=""):
         self.id = comp_id
-        self.type = comp_type # 'button', 'label', 'box', 'checkbox'
+        self.type = comp_type # 'button', 'label'
         self.text = text
         self.parent = None
         
@@ -52,9 +52,6 @@ class UIComponent:
         # Proprietà specifiche per etichette (label)
         self.label_shadow = "false"
         self.label_max_width = ""
-        
-        # Proprietà specifiche per box colorati
-        self.box_color = "#FF4CAF50"
 
 class UILayout(UIComponent):
     def __init__(self, comp_id, layout_type="Flow Layout", rows="2", cols="2", direction="vertical"):
@@ -103,12 +100,12 @@ class OwoQtDesigner:
         self.root.title("oωo-lib UI Advanced Designer (NeoForge 1.21.1)")
         self.root.geometry("1350x955")
         
-        # NUOVA VARIABILE: Memorizza il percorso completo del file caricato o salvato
+        # Memorizza il percorso completo del file caricato o salvato
         self.current_file_path = None
         
         # Configurazione iniziale del layout principale sbloccato
         self.main_layout = UILayout("root_flow", "Flow Layout", direction="vertical")
-        self.main_layout.surface_type = "vanilla-translucent" # Default standard delle guide oωo
+        self.main_layout.surface_type = "vanilla-translucent"
         self.selected_component = self.main_layout
         
         self.layout_counter = 1
@@ -146,7 +143,7 @@ class OwoQtDesigner:
         tk.Button(toolbox, text="📂 Importa XML", bg="#FF9800", fg="white", command=self.import_xml).pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="💾 Esporta XML Valido", bg="#4CAF50", fg="white", command=self.export_xml).pack(fill=tk.X, padx=15, pady=2)
         
-        # Container fisso per i controlli del template (risolto bug risonanza geometrica)
+        # Container fisso per i controlli del template
         self.template_control_container = tk.Frame(toolbox, bg=self.bg_panel)
         self.template_control_container.pack(fill=tk.X, padx=15, pady=4)
 
@@ -176,11 +173,10 @@ class OwoQtDesigner:
 
         tk.Frame(toolbox, height=1, bg="#444").pack(fill=tk.X, pady=6)
 
+        # MODIFICATO: Rimosse Spatola colore e Spunta checkbox dai pulsanti di inserimento
         tk.Label(toolbox, text="Componenti Base (Foglia)", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=10, pady=2)
         tk.Button(toolbox, text="+ Bottone (button)", command=lambda: self.add_leaf_node("button", "A Button"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="+ Testo (label)", command=lambda: self.add_leaf_node("label", "Text Label"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
-        tk.Button(toolbox, text="+ Spatola Colore (box)", command=lambda: self.add_leaf_node("box", ""), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
-        tk.Button(toolbox, text="+ Spunta (checkbox)", command=lambda: self.add_leaf_node("checkbox", "Option"), bg="#444", fg="white").pack(fill=tk.X, padx=15, pady=2)
 
     def toggle_template_name_visibility(self):
         """Mostra o nasconde l'entry del nome del template senza rompere il layout"""
@@ -221,7 +217,7 @@ class OwoQtDesigner:
         self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale unificati sotto lo stesso frame)
+        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale unificati)
         self.sizing_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.sizing_frame, text="Metodo Orizzontale (horizontal):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_w_method = tk.StringVar(value="content")
@@ -244,7 +240,6 @@ class OwoQtDesigner:
         tk.Label(self.pad_all_frame, text="Valore All:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT, padx=5)
         self.prop_padding_all_entry = tk.Entry(self.pad_all_frame, width=12); self.prop_padding_all_entry.pack(side=tk.LEFT, padx=5)
         
-        # CORREZIONE COMPILATORE: Risolto il bug di ridondanza (parent impostato correttamente su self.pad_indiv_frame)
         self.pad_indiv_frame = tk.Frame(self.padding_placeholder_frame, bg=self.bg_panel)
         tk.Label(self.pad_indiv_frame, text="T:", fg="white", bg=self.bg_panel).grid(row=0, column=0, padx=2, pady=2)
         self.prop_pad_top = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_top.grid(row=0, column=1, padx=2, pady=2)
@@ -301,15 +296,13 @@ class OwoQtDesigner:
         tk.Label(self.grid_prop_frame, text="C:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT)
         self.prop_cols_entry = tk.Entry(self.grid_prop_frame, width=4); self.prop_cols_entry.pack(side=tk.LEFT, padx=4)
 
-        # 7. Controlli Specifici Foglie
+        # 7. Controlli Specifici Foglie (MODIFICATO: rimosse le opzioni per il componente box color)
         self.leaf_extra_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         self.label_shadow_label = tk.Label(self.leaf_extra_frame, text="Ombra Testo (Label shadow):", fg="white", bg=self.bg_panel)
         self.prop_l_shadow = tk.StringVar(value="false")
         self.label_shadow_menu = tk.OptionMenu(self.leaf_extra_frame, self.prop_l_shadow, "true", "false")
         self.label_mw_label = tk.Label(self.leaf_extra_frame, text="Larghezza Max Testo (Max-Width):", fg="white", bg=self.bg_panel)
         self.prop_l_mw = tk.Entry(self.leaf_extra_frame)
-        self.box_color_label = tk.Label(self.leaf_extra_frame, text="Colore Sfondo Box (HEX):", fg="white", bg=self.bg_panel)
-        self.prop_b_color = tk.Entry(self.leaf_extra_frame)
 
         # 8. Bottoni d'Azione (Sempre visibili fissati in basso)
         self.actions_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
@@ -343,7 +336,7 @@ class OwoQtDesigner:
         self.canvas.delete("all")
         cx1, cy1, cx2, cy2 = 40, 40, 680, 560
         
-        # Sbloccato il root: Evidenzia in blu il bordo del root se selezionato, altrimenti grigio scuro
+        # Evidenzia in blu il bordo del root se selezionato, altrimenti grigio scuro
         root_color = self.accent_blue if self.selected_component == self.main_layout else "#444"
         self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill="#1a1a1a", outline=root_color, width=2, tags=f"click_{self.main_layout.id}")
         self.canvas.create_text(cx1+10, cy1+15, text="Game Viewport (oωo Layout Snapping)", fill="gray", anchor=tk.W, tags=f"click_{self.main_layout.id}")
@@ -395,14 +388,15 @@ class OwoQtDesigner:
             if isinstance(child, UILayout):
                 self.render_layout_recursive(child, cx1, cy1, cx2, cy2)
             elif isinstance(child, UIComponent):
-                colors = {"button": "#3a3a3a", "label": "#151515", "box": child.box_color, "checkbox": "#2e2e2e"}
-                outlines = {"button": "#fff", "label": "#555", "box": "#ffffff", "checkbox": "#aaa"}
+                # MODIFICATO: Rimosse mappature colori box e checkbox obsolete
+                colors = {"button": "#3a3a3a", "label": "#151515"}
+                outlines = {"button": "#fff", "label": "#555"}
                 
                 b_color = colors.get(child.type, "#3a3a3a") if self.selected_component != child else "#555"
                 o_color = outlines.get(child.type, "#fff") if self.selected_component != child else self.accent_blue
                 
                 self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill=b_color, outline=o_color, width=1.5, tags=f"click_{child.id}")
-                text_disp = f"[{child.type}] {child.text}" if child.type != "box" else "[box component]"
+                text_disp = f"[{child.type}] {child.text}"
                 self.canvas.create_text((cx1+cx2)/2, (cy1+cy2)/2, text=text_disp, fill="white", font=("Arial", 9), tags=f"click_{child.id}")
 
     # =====================================================================
@@ -417,7 +411,7 @@ class OwoQtDesigner:
 
         clicked_tags = self.canvas.find_withtag(tk.CURRENT)
         if not clicked_tags:
-            # Sbloccato il root: Cliccare sul vuoto dello sfondo seleziona ed edita il root_flow
+            # Cliccare sul vuoto dello sfondo seleziona ed edita il root_flow
             self.selected_component = self.main_layout
             self.show_property_editor(self.main_layout)
             self.rebuild_and_snap()
@@ -526,7 +520,7 @@ class OwoQtDesigner:
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR STRUTTURATO (ORDINATO CON TESTO SOTTO L'ID)
+    # PROPERTY EDITOR STRUTTURATO (ID E TESTO CORRETTI E COERENTI)
     # =====================================================================
 
     def show_property_editor(self, comp):
@@ -537,7 +531,7 @@ class OwoQtDesigner:
         self.id_frame.pack(fill=tk.X)
         self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
 
-        # CORREZIONE POSIZIONE: Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
+        # Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
         if not isinstance(comp, UILayout):
             self.text_frame.pack(fill=tk.X)
             self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
@@ -565,7 +559,7 @@ class OwoQtDesigner:
                 self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
                 self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
         else:
-            # Per le foglie, attiva il modulo opzioni avanzate del widget (Testo e ID sono sopra stabili)
+            # Per le foglie, attiva il modulo opzioni avanzate del widget (MODIFICATO: rimosse logiche box)
             self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
             if comp.type == "label":
@@ -576,12 +570,6 @@ class OwoQtDesigner:
             else:
                 self.label_shadow_label.pack_forget(); self.label_shadow_menu.pack_forget()
                 self.label_mw_label.pack_forget(); self.prop_l_mw.pack_forget()
-                
-            if comp.type == "box":
-                self.box_color_label.pack(anchor=tk.W); self.prop_b_color.pack(fill=tk.X)
-                self.prop_b_color.delete(0, tk.END); self.prop_b_color.insert(0, comp.box_color)
-            else:
-                self.box_color_label.pack_forget(); self.prop_b_color.pack_forget()
 
         # 4. Sincronizzazione delle variabili geometriche con i dati correnti del modello
         self.prop_w_method.set(comp.width_method)
@@ -662,8 +650,6 @@ class OwoQtDesigner:
             if self.selected_component.type == "label":
                 self.selected_component.label_shadow = self.prop_l_shadow.get()
                 self.selected_component.label_max_width = self.prop_l_mw.get()
-            elif self.selected_component.type == "box":
-                self.selected_component.box_color = self.prop_b_color.get()
                 
         self.rebuild_and_snap()
 
@@ -691,7 +677,7 @@ class OwoQtDesigner:
         xml_str = ET.tostring(owo_ui, encoding="utf-8")
         pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
         
-        # CORREZIONE PERSISTENZA: Calcola il nome e la cartella precedentemente salvati/importati
+        # Persistenza nome file: Pre-compilazione dati geometrici originari
         initial_name = os.path.basename(self.current_file_path) if self.current_file_path else "nuovo_layout.xml"
         initial_dir = os.path.dirname(self.current_file_path) if self.current_file_path else "."
 
@@ -702,13 +688,12 @@ class OwoQtDesigner:
             filetypes=[("XML Files", "*.xml")]
         )
         if file_path:
-            # Memorizza il percorso del file salvato per le prossime sessioni
             self.current_file_path = file_path
             with open(file_path, "w", encoding="utf-8") as f: f.write(pretty_xml)
             messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
 
     def serialize_node_recursive(self, xml_parent, obj):
-        attrs = {"id": obj.id} # Esporta l'id nativamente per TUTTI i nodi, inclusi i layout
+        attrs = {"id": obj.id} 
         if isinstance(obj, UILayout):
             if obj.layout_type == "Flow Layout":
                 tag = "flow-layout"
@@ -729,12 +714,9 @@ class OwoQtDesigner:
             for child in obj.children:
                 self.serialize_node_recursive(children_container, child)
 
-        if tag in ["button", "label", "checkbox"] and obj.text:
+        # MODIFICATO: Rimosso blocco di serializzazione box e checkbox
+        if tag in ["button", "label"] and obj.text:
             ET.SubElement(node, "text").text = obj.text
-        elif tag == "box":
-            ET.SubElement(node, "color").text = obj.box_color
-            ET.SubElement(node, "fill").text = "true"
-            ET.SubElement(node, "direction").text = "top-to-bottom"
 
         if tag == "label":
             if obj.label_shadow == "true": ET.SubElement(node, "shadow").text = "true"
@@ -783,7 +765,6 @@ class OwoQtDesigner:
             ET.SubElement(node, "horizontal-alignment").text = obj.horiz_align
             ET.SubElement(node, "vertical-alignment").text = obj.vert_align
             
-            # Sbloccato il root: Rispetta l'esatta scelta dell'utente per le superfici, root compreso!
             if obj.surface_type != "none":
                 surface_node = ET.SubElement(node, "surface")
                 if obj.surface_type == "panel-dark": ET.SubElement(surface_node, "panel", {"dark": "true"})
@@ -794,7 +775,6 @@ class OwoQtDesigner:
         file_path = filedialog.askopenfilename(filetypes=[("XML Files", "*.xml")])
         if not file_path: return
         try:
-            # CORREZIONE PERSISTENZA: Memorizza il percorso completo del file XML importato
             self.current_file_path = file_path
 
             tree = ET.parse(file_path)
@@ -889,7 +869,6 @@ class OwoQtDesigner:
             else:
                 self.main_layout.surface_type = "none"
 
-            # Al termine dell'importazione, imposta la selezione sul root per mostrare i dati caricati
             self.selected_component = self.main_layout
             self.show_property_editor(self.main_layout)
             
@@ -952,7 +931,6 @@ class OwoQtDesigner:
                         sub_layout.height_method = v_xml.get("method", "content")
                         sub_layout.height_value = safe_text(v_xml, "100")
                 
-                # Carica la superficie originale per tutti i sotto-layout ricorsivi importati
                 surf_node = child.find("surface")
                 if surf_node is not None:
                     if surf_node.find("panel") is not None:
@@ -970,7 +948,8 @@ class OwoQtDesigner:
                 inner_children = child.find("children")
                 if inner_children is not None: self.parse_xml_recursive(inner_children, sub_layout)
                 
-            elif child.tag in ["button", "label", "box", "checkbox"]:
+            # MODIFICATO: Rimosse box e checkbox dal parser ad albero gerarchico dei componenti foglia
+            elif child.tag in ["button", "label"]:
                 w_id = child.get("id", f"{child.tag}_{self.widget_counter}")
                 if f"{child.tag}_{self.widget_counter}" == w_id:
                     self.widget_counter += 1
@@ -1010,9 +989,6 @@ class OwoQtDesigner:
                     if sh is not None: leaf_node.label_shadow = safe_text(sh, "false")
                     mw = child.find("max-width")
                     if mw is not None: leaf_node.label_max_width = safe_text(mw, "")
-                elif child.tag == "box":
-                    col = child.find("color")
-                    if col is not None: leaf_node.box_color = safe_text(col, "#FF4CAF50")
 
                 sizing = child.find("sizing")
                 if sizing is not None:
