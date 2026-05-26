@@ -102,7 +102,9 @@ class OwoQtDesigner:
         self.root.title("oωo-lib UI Advanced Designer (NeoForge 1.21.1)")
         self.root.geometry("1350x955")
         
+        # Configurazione iniziale del layout principale sbloccato
         self.main_layout = UILayout("root_flow", "Flow Layout", direction="vertical")
+        self.main_layout.surface_type = "vanilla-translucent" # Default standard delle guide oωo
         self.selected_component = self.main_layout
         
         self.layout_counter = 1
@@ -119,6 +121,8 @@ class OwoQtDesigner:
         self.create_center_viewport()
         self.create_right_property_panel()
         
+        # Mostra le proprietà del root_flow all'avvio
+        self.show_property_editor(self.main_layout)
         self.rebuild_and_snap()
 
     def setup_style(self):
@@ -138,7 +142,7 @@ class OwoQtDesigner:
         tk.Button(toolbox, text="📂 Importa XML", bg="#FF9800", fg="white", command=self.import_xml).pack(fill=tk.X, padx=15, pady=2)
         tk.Button(toolbox, text="💾 Esporta XML Valido", bg="#4CAF50", fg="white", command=self.export_xml).pack(fill=tk.X, padx=15, pady=2)
         
-        # Container fisso per i controlli del template (risolve il bug della sparizione)
+        # Container fisso per i controlli del template (risolto bug risonanza geometrica)
         self.template_control_container = tk.Frame(toolbox, bg=self.bg_panel)
         self.template_control_container.pack(fill=tk.X, padx=15, pady=4)
 
@@ -207,13 +211,13 @@ class OwoQtDesigner:
         self.prop_id_entry = tk.Entry(self.id_frame)
         self.prop_id_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # 2. Modulo Testo (Visibile unicamente per i componenti foglia)
+        # 2. Modulo Testo (Visibile unicamente sotto l'ID per i componenti foglia)
         self.text_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.text_frame, text="Contenuto Testo:", fg="white", bg=self.bg_panel).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale sotto lo stesso frame finto)
+        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale unificati)
         self.sizing_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.sizing_frame, text="Metodo Orizzontale (horizontal):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_w_method = tk.StringVar(value="content")
@@ -333,8 +337,11 @@ class OwoQtDesigner:
     def rebuild_and_snap(self):
         self.canvas.delete("all")
         cx1, cy1, cx2, cy2 = 40, 40, 680, 560
-        self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill="#1a1a1a", outline="#444", width=2)
-        self.canvas.create_text(cx1+10, cy1+15, text="Game Viewport (oωo Layout Snapping)", fill="gray", anchor=tk.W)
+        
+        # Evidenzia in blu il bordo del root se selezionato, altrimenti grigio scuro
+        root_color = self.accent_blue if self.selected_component == self.main_layout else "#444"
+        self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill="#1a1a1a", outline=root_color, width=2, tags=f"click_{self.main_layout.id}")
+        self.canvas.create_text(cx1+10, cy1+15, text="Game Viewport (oωo Layout Snapping)", fill="gray", anchor=tk.W, tags=f"click_{self.main_layout.id}")
         
         self.main_layout.bounds = (cx1, cy1, cx2, cy2)
         self.render_layout_recursive(self.main_layout, cx1+20, cy1+40, cx2-20, cy2-20)
@@ -405,8 +412,9 @@ class OwoQtDesigner:
 
         clicked_tags = self.canvas.find_withtag(tk.CURRENT)
         if not clicked_tags:
+            # Cliccare sul vuoto seleziona il layout principale sbloccando i campi!
             self.selected_component = self.main_layout
-            self.hide_property_editor()
+            self.show_property_editor(self.main_layout)
             self.rebuild_and_snap()
             return
             
@@ -509,22 +517,22 @@ class OwoQtDesigner:
         if not self.selected_component or self.selected_component.id == "root_flow": return
         if self.remove_component_recursive(self.main_layout, self.selected_component):
             self.selected_component = self.main_layout
-            self.hide_property_editor()
+            self.show_property_editor(self.main_layout)
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR STRUTTURATO (ID SEMPRE VISIBILE SE SELEZIONATO)
+    # PROPERTY EDITOR STRUTTURATO (ID E TESTO CORRETTI E COERENTI)
     # =====================================================================
 
     def show_property_editor(self, comp):
         # 1. Reset e smontaggio completo di tutti i moduli visivi
         self.hide_property_editor()
 
-        # 2. Montiamo l'id_frame ad albero per PRIMO, rendendo l'ID sempre visibile (Layout inclusi)
+        # 2. Montiamo l'id_frame ad albero per PRIMO (Sempre visibile per Layout e foglie!)
         self.id_frame.pack(fill=tk.X)
         self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
 
-        # AGGIORNAMENTO CORREZIONE: Se l'elemento è una foglia, agganciamo il modulo del testo SUBITO sotto l'ID
+        # Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
         if not isinstance(comp, UILayout):
             self.text_frame.pack(fill=tk.X)
             self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
@@ -535,7 +543,7 @@ class OwoQtDesigner:
         self.margins_frame.pack(fill=tk.X)
 
         if isinstance(comp, UILayout):
-            # Se è un layout monta solo le opzioni di allineamento e superficie extra
+            # Se è un layout monta le opzioni di allineamento e superficie extra
             self.layout_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
             self.prop_l_horiz.set(comp.horiz_align)
@@ -552,7 +560,7 @@ class OwoQtDesigner:
                 self.prop_rows_entry.delete(0, tk.END); self.prop_rows_entry.insert(0, comp.rows)
                 self.prop_cols_entry.delete(0, tk.END); self.prop_cols_entry.insert(0, comp.cols)
         else:
-            # Per le foglie, attiva il modulo opzioni avanzate del widget (Testo e ID sono già sopra fisse)
+            # Per le foglie, attiva il modulo opzioni avanzate del widget (Testo e ID sono sopra stabili)
             self.leaf_extra_frame.pack(fill=tk.X, padx=15, pady=5)
             
             if comp.type == "label":
@@ -570,7 +578,7 @@ class OwoQtDesigner:
             else:
                 self.box_color_label.pack_forget(); self.prop_b_color.pack_forget()
 
-        # 4. Sincronizzazione delle variabili logiche con i dati correnti del modello
+        # 4. Sincronizzazione delle variabili geometriche con i dati correnti del modello
         self.prop_w_method.set(comp.width_method)
         self.prop_w_val.delete(0, tk.END); self.prop_w_val.insert(0, comp.width_value)
         self.prop_h_method.set(comp.height_method)
@@ -759,10 +767,8 @@ class OwoQtDesigner:
             ET.SubElement(node, "horizontal-alignment").text = obj.horiz_align
             ET.SubElement(node, "vertical-alignment").text = obj.vert_align
             
-            if obj.id == "root_flow":
-                surface_node = ET.SubElement(node, "surface")
-                ET.SubElement(surface_node, "vanilla-translucent")
-            elif obj.surface_type != "none":
+            # CORREZIONE: Rispetta l'esatta scelta dell'utente per le superfici, root compreso!
+            if obj.surface_type != "none":
                 surface_node = ET.SubElement(node, "surface")
                 if obj.surface_type == "panel-dark": ET.SubElement(surface_node, "panel", {"dark": "true"})
                 elif obj.surface_type == "vanilla-translucent": ET.SubElement(surface_node, "vanilla-translucent")
@@ -844,7 +850,29 @@ class OwoQtDesigner:
                     self.main_layout.height_method = v_xml.get("method", "content")
                     self.main_layout.height_value = safe_text(v_xml, "100")
 
+            # CORREZIONE: Carica l'allineamento orizzontale e verticale originale per il blocco root
+            h_align = main_flow.find("horizontal-alignment")
+            if h_align is not None: self.main_layout.horiz_align = safe_text(h_align, "center")
+            v_align = main_flow.find("vertical-alignment")
+            if v_align is not None: self.main_layout.vert_align = safe_text(v_align, "center")
+
+            # CORREZIONE: Carica la superficie originale per il blocco root
+            surf_node = main_flow.find("surface")
+            if surf_node is not None:
+                if surf_node.find("panel") is not None:
+                    self.main_layout.surface_type = "panel-dark"
+                elif surf_node.find("vanilla-translucent") is not None:
+                    self.main_layout.surface_type = "vanilla-translucent"
+                elif surf_node.find("flat") is not None:
+                    self.main_layout.surface_type = "flat-black"
+                else:
+                    self.main_layout.surface_type = "none"
+            else:
+                self.main_layout.surface_type = "none"
+
+            # Al termine dell'importazione, imposta la selezione sul root per mostrare i dati caricati
             self.selected_component = self.main_layout
+            self.show_property_editor(self.main_layout)
             
             main_children = main_flow.find("children")
             if main_children is not None: self.parse_xml_recursive(main_children, self.main_layout)
@@ -904,6 +932,20 @@ class OwoQtDesigner:
                     if v_xml is not None:
                         sub_layout.height_method = v_xml.get("method", "content")
                         sub_layout.height_value = safe_text(v_xml, "100")
+                
+                # CORREZIONE: Carica la superficie originale per tutti i sotto-layout ricorsivi importati
+                surf_node = child.find("surface")
+                if surf_node is not None:
+                    if surf_node.find("panel") is not None:
+                        sub_layout.surface_type = "panel-dark"
+                    elif surf_node.find("vanilla-translucent") is not None:
+                        sub_layout.surface_type = "vanilla-translucent"
+                    elif surf_node.find("flat") is not None:
+                        sub_layout.surface_type = "flat-black"
+                    else:
+                        sub_layout.surface_type = "none"
+                else:
+                    sub_layout.surface_type = "none"
                     
                 parent_obj.add_child(sub_layout)
                 inner_children = child.find("children")
