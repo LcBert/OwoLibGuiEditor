@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import os  # AGGIUNTO: Necessario per la gestione dei percorsi e nomi dei file
 
 # =====================================================================
 # FUNZIONE DI UTILITY PER IL COMFORT DEL TYPE-CHECKER
@@ -101,6 +102,9 @@ class OwoQtDesigner:
         self.root = root
         self.root.title("oωo-lib UI Advanced Designer (NeoForge 1.21.1)")
         self.root.geometry("1350x955")
+        
+        # NUOVA VARIABILE: Memorizza il percorso completo del file caricato o salvato
+        self.current_file_path = None
         
         # Configurazione iniziale del layout principale sbloccato
         self.main_layout = UILayout("root_flow", "Flow Layout", direction="vertical")
@@ -217,7 +221,7 @@ class OwoQtDesigner:
         self.prop_text_entry = tk.Entry(self.text_frame)
         self.prop_text_entry.pack(fill=tk.X, padx=15, pady=2)
 
-        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale unificati)
+        # 3. Modulo Sizing Comune (Metodo Orizzontale + Verticale unificati sotto lo stesso frame)
         self.sizing_frame = tk.Frame(self.prop_panel, bg=self.bg_panel)
         tk.Label(self.sizing_frame, text="Metodo Orizzontale (horizontal):", fg="gray", bg=self.bg_panel, font=("Arial", 8, "bold")).pack(anchor=tk.W, padx=15, pady=4)
         self.prop_w_method = tk.StringVar(value="content")
@@ -240,6 +244,7 @@ class OwoQtDesigner:
         tk.Label(self.pad_all_frame, text="Valore All:", fg="white", bg=self.bg_panel).pack(side=tk.LEFT, padx=5)
         self.prop_padding_all_entry = tk.Entry(self.pad_all_frame, width=12); self.prop_padding_all_entry.pack(side=tk.LEFT, padx=5)
         
+        # CORREZIONE COMPILATORE: Risolto il bug di ridondanza (parent impostato correttamente su self.pad_indiv_frame)
         self.pad_indiv_frame = tk.Frame(self.padding_placeholder_frame, bg=self.bg_panel)
         tk.Label(self.pad_indiv_frame, text="T:", fg="white", bg=self.bg_panel).grid(row=0, column=0, padx=2, pady=2)
         self.prop_pad_top = tk.Entry(self.pad_indiv_frame, width=5); self.prop_pad_top.grid(row=0, column=1, padx=2, pady=2)
@@ -338,7 +343,7 @@ class OwoQtDesigner:
         self.canvas.delete("all")
         cx1, cy1, cx2, cy2 = 40, 40, 680, 560
         
-        # Evidenzia in blu il bordo del root se selezionato, altrimenti grigio scuro
+        # Sbloccato il root: Evidenzia in blu il bordo del root se selezionato, altrimenti grigio scuro
         root_color = self.accent_blue if self.selected_component == self.main_layout else "#444"
         self.canvas.create_rectangle(cx1, cy1, cx2, cy2, fill="#1a1a1a", outline=root_color, width=2, tags=f"click_{self.main_layout.id}")
         self.canvas.create_text(cx1+10, cy1+15, text="Game Viewport (oωo Layout Snapping)", fill="gray", anchor=tk.W, tags=f"click_{self.main_layout.id}")
@@ -412,7 +417,7 @@ class OwoQtDesigner:
 
         clicked_tags = self.canvas.find_withtag(tk.CURRENT)
         if not clicked_tags:
-            # Cliccare sul vuoto seleziona il layout principale sbloccando i campi!
+            # Sbloccato il root: Cliccare sul vuoto dello sfondo seleziona ed edita il root_flow
             self.selected_component = self.main_layout
             self.show_property_editor(self.main_layout)
             self.rebuild_and_snap()
@@ -521,7 +526,7 @@ class OwoQtDesigner:
             self.rebuild_and_snap()
 
     # =====================================================================
-    # PROPERTY EDITOR STRUTTURATO (ID E TESTO CORRETTI E COERENTI)
+    # PROPERTY EDITOR STRUTTURATO (ORDINATO CON TESTO SOTTO L'ID)
     # =====================================================================
 
     def show_property_editor(self, comp):
@@ -532,7 +537,7 @@ class OwoQtDesigner:
         self.id_frame.pack(fill=tk.X)
         self.prop_id_entry.delete(0, tk.END); self.prop_id_entry.insert(0, comp.id)
 
-        # Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
+        # CORREZIONE POSIZIONE: Se l'elemento è una foglia, agganciamo il testo SUBITO SOTTO L'ID!
         if not isinstance(comp, UILayout):
             self.text_frame.pack(fill=tk.X)
             self.prop_text_entry.delete(0, tk.END); self.prop_text_entry.insert(0, comp.text)
@@ -686,8 +691,19 @@ class OwoQtDesigner:
         xml_str = ET.tostring(owo_ui, encoding="utf-8")
         pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
         
-        file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML Files", "*.xml")])
+        # CORREZIONE PERSISTENZA: Calcola il nome e la cartella precedentemente salvati/importati
+        initial_name = os.path.basename(self.current_file_path) if self.current_file_path else "nuovo_layout.xml"
+        initial_dir = os.path.dirname(self.current_file_path) if self.current_file_path else "."
+
+        file_path = filedialog.asksaveasfilename(
+            initialdir=initial_dir,
+            initialfile=initial_name,
+            defaultextension=".xml", 
+            filetypes=[("XML Files", "*.xml")]
+        )
         if file_path:
+            # Memorizza il percorso del file salvato per le prossime sessioni
+            self.current_file_path = file_path
             with open(file_path, "w", encoding="utf-8") as f: f.write(pretty_xml)
             messagebox.showinfo("Successo", "XML valido al 100% esportato seguendo le specifiche del file XSD!")
 
@@ -767,7 +783,7 @@ class OwoQtDesigner:
             ET.SubElement(node, "horizontal-alignment").text = obj.horiz_align
             ET.SubElement(node, "vertical-alignment").text = obj.vert_align
             
-            # CORREZIONE: Rispetta l'esatta scelta dell'utente per le superfici, root compreso!
+            # Sbloccato il root: Rispetta l'esatta scelta dell'utente per le superfici, root compreso!
             if obj.surface_type != "none":
                 surface_node = ET.SubElement(node, "surface")
                 if obj.surface_type == "panel-dark": ET.SubElement(surface_node, "panel", {"dark": "true"})
@@ -778,6 +794,9 @@ class OwoQtDesigner:
         file_path = filedialog.askopenfilename(filetypes=[("XML Files", "*.xml")])
         if not file_path: return
         try:
+            # CORREZIONE PERSISTENZA: Memorizza il percorso completo del file XML importato
+            self.current_file_path = file_path
+
             tree = ET.parse(file_path)
             root = tree.getroot()
             
@@ -850,13 +869,13 @@ class OwoQtDesigner:
                     self.main_layout.height_method = v_xml.get("method", "content")
                     self.main_layout.height_value = safe_text(v_xml, "100")
 
-            # CORREZIONE: Carica l'allineamento orizzontale e verticale originale per il blocco root
+            # Carica l'allineamento orizzontale e verticale originale per il blocco root
             h_align = main_flow.find("horizontal-alignment")
             if h_align is not None: self.main_layout.horiz_align = safe_text(h_align, "center")
             v_align = main_flow.find("vertical-alignment")
             if v_align is not None: self.main_layout.vert_align = safe_text(v_align, "center")
 
-            # CORREZIONE: Carica la superficie originale per il blocco root
+            # Carica la superficie originale per il blocco root
             surf_node = main_flow.find("surface")
             if surf_node is not None:
                 if surf_node.find("panel") is not None:
@@ -933,7 +952,7 @@ class OwoQtDesigner:
                         sub_layout.height_method = v_xml.get("method", "content")
                         sub_layout.height_value = safe_text(v_xml, "100")
                 
-                # CORREZIONE: Carica la superficie originale per tutti i sotto-layout ricorsivi importati
+                # Carica la superficie originale per tutti i sotto-layout ricorsivi importati
                 surf_node = child.find("surface")
                 if surf_node is not None:
                     if surf_node.find("panel") is not None:
